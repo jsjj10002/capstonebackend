@@ -26,6 +26,11 @@ const diarySchema = new mongoose.Schema(
         type: String, // 이미지 URL을 저장
       },
     ],
+    photoFeatures: [
+      {
+        type: String, // 각 이미지에 대한 OpenAI API 분석 결과
+      },
+    ],
     tags: [
       {
         type: String,
@@ -42,7 +47,7 @@ const diarySchema = new mongoose.Schema(
 );
 
 // 검색을 위한 인덱스 생성
-diarySchema.index({ title: 'text', content: 'text', tags: 'text' });
+diarySchema.index({ title: 'text', content: 'text', tags: 'text', photoFeatures: 'text' });
 
 const Diary = mongoose.model('Diary', diarySchema);
 

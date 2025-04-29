@@ -1,70 +1,116 @@
-# Getting Started with Create React App
+*최종 업데이트: 2025-04-30*
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## 진행 상황 정리
 
-## Available Scripts
+### 1. 백엔드 개발
 
-In the project directory, you can run:
+- Express.js 기반 RESTful API 서버 구축
+- MongoDB 데이터베이스 연결 설정
+- 사용자 인증 및 권한 관리 구현
+- 일기 CRUD 기능 구현
+- 이미지 업로드 기능 구현
+- OpenAI API를 활용한 이미지 특징 분석 기능 추가
+- 주변 사람들의 정보 및 사진 관리 기능 추가
 
-### `npm start`
+### 2. AWS 설정
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- IAM 사용자 생성 및 액세스 키 발급
+- S3 버킷 생성 (보안 설정 적용)
+- S3 서명된 URL 기능 추가 (비공개 이미지 접근용)
+- uploadToS3 함수에서 ACL: 'public-read' 제거됨
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### 3. 환경 변수 설정
 
-### `npm test`
+- MongoDB 연결 키
+- JWT 비밀키
+- AWS 액세스 키 및 설정
+- 포트 설정
+- OpenAI API 키
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## 구현 기능
 
-### `npm run build`
+### 1. 사용자 관리
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- 회원가입 (얼굴 사진 업로드 포함)
+- 로그인/인증
+- 프로필 조회 및 업데이트
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### 2. 일기 관리
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- 일기 작성 (텍스트 및 이미지 업로드)
+- 일기 조회 (전체 또는 개별)
+- 일기 수정 및 삭제
+- 일기 검색 기능
 
-### `npm run eject`
+### 3. 사람 관리
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+- 주변 사람들의 정보 및 사진 추가
+- 사람 정보 조회 (목록/개별)
+- 사람 정보 수정 및 삭제
+- 사람 검색 기능
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### 4. 이미지 분석
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+- OpenAI API를 활용한 이미지 특징 분석
+- 이미지 특징을 기반으로 한 검색 기능
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### 5. 파일 업로드
 
-## Learn More
+- 로컬 스토리지 및 AWS S3 클라우드 스토리지 지원
+- 이미지 파일 필터링 및 크기 제한
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### 6. 보안
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- JWT 기반 인증
+- 비밀번호 해싱
+- 권한 검증
 
-### Code Splitting
+## API 명세
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+| 메소드 | 엔드포인트                     | 설명                 | 인증 필요 | 요청 본문                                      | 응답                                       |
+|--------|--------------------------------|----------------------|-----------|-----------------------------------------------|-------------------------------------------|
+| POST   | /api/users/register            | 회원가입             | 아니오    | username, email, password, profilePhoto(파일) | 사용자 정보, JWT 토큰                     |
+| POST   | /api/users/login               | 로그인               | 아니오    | email, password                               | 사용자 정보, JWT 토큰                     |
+| GET    | /api/users/profile             | 프로필 조회          | 예        | -                                             | 사용자 정보                               |
+| PUT    | /api/users/profile/photo       | 프로필 사진 업데이트 | 예        | profilePhoto(파일)                           | 업데이트된 사용자 정보                    |
+| POST   | /api/diaries                   | 일기 작성            | 예        | title, content, mood, tags, photos(파일)     | 생성된 일기 정보                          |
+| GET    | /api/diaries                   | 내 일기 전체 조회    | 예        | -                                             | 일기 목록                                 |
+| GET    | /api/diaries/search?keyword=값 | 일기 검색            | 예        | query: keyword                               | 검색 결과 일기 목록                       |
+| GET    | /api/diaries/:id               | 특정 일기 조회       | 예        | -                                             | 일기 상세 정보                            |
+| PUT    | /api/diaries/:id               | 일기 수정            | 예        | title, content, mood, tags, photos(파일)     | 업데이트된 일기 정보                      |
+| DELETE | /api/diaries/:id               | 일기 삭제            | 예        | -                                             | 성공 메시지                               |
+| POST   | /api/people                    | 사람 추가            | 예        | name, relation, notes, photo(파일)           | 생성된 사람 정보                          |
+| GET    | /api/people                    | 내가 추가한 사람 목록 | 예        | -                                             | 사람 목록                                 |
+| GET    | /api/people/search?keyword=값  | 사람 검색            | 예        | query: keyword                               | 검색 결과 사람 목록                       |
+| GET    | /api/people/:id                | 특정 사람 조회       | 예        | -                                             | 사람 상세 정보                            |
+| PUT    | /api/people/:id                | 사람 정보 수정       | 예        | name, relation, notes, photo(파일)           | 업데이트된 사람 정보                      |
+| DELETE | /api/people/:id                | 사람 삭제            | 예        | -                                             | 성공 메시지                               |
 
-### Analyzing the Bundle Size
+## 실행 방법
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### 필수 환경 변수
 
-### Making a Progressive Web App
+프로젝트 루트에 `.env` 파일을 생성하고 다음 환경 변수를 설정:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+```
+PORT=5000
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+AWS_REGION=your_aws_region
+AWS_S3_BUCKET=your_s3_bucket_name
+OPENAI_API_KEY=your_openai_api_key
+```
 
-### Advanced Configuration
+### 개발 서버 실행
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+```bash
+# 의존성 설치
+npm install
 
-### Deployment
+# 개발 서버 실행
+npm run dev
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+서버는 기본적으로 http://localhost:5000 에서 실행됨

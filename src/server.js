@@ -21,10 +21,12 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // 라우트 import
 const userRoutes = require('./routes/userRoutes');
 const diaryRoutes = require('./routes/diaryRoutes');
+const personRoutes = require('./routes/personRoutes');
 
 // 라우트 설정
 app.use('/api/users', userRoutes);
 app.use('/api/diaries', diaryRoutes);
+app.use('/api/people', personRoutes);
 
 // MongoDB 연결
 mongoose

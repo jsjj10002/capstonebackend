@@ -1,6 +1,7 @@
 const User = require('../models/userModel');
 const jwt = require('jsonwebtoken');
 const { uploadToS3 } = require('../config/uploadConfig');
+const { analyzeImageFeatures } = require('../config/openaiConfig');
 const fs = require('fs');
 const path = require('path');
 
@@ -25,6 +26,7 @@ const registerUser = async (req, res) => {
 
     // 프로필 사진 정보
     let profilePhoto = '';
+    let profilePhotoFeatures = '';
 
     // 프로필 사진이 업로드된 경우
     if (req.file) {
@@ -33,10 +35,13 @@ const registerUser = async (req, res) => {
         const result = await uploadToS3(req.file);
         profilePhoto = result.Location; // S3에 업로드된 파일의 URL
         
+        // OpenAI API로 이미지 특징 분석
+        profilePhotoFeatures = await analyzeImageFeatures(req.file.path);
+        
         // 로컬 임시 파일 삭제
         fs.unlinkSync(req.file.path);
       } catch (error) {
-        console.error('S3 업로드 오류:', error);
+        console.error('S3 업로드 또는 이미지 분석 오류:', error);
         // S3 업로드 실패 시 로컬 경로 사용
         profilePhoto = `/uploads/${path.basename(req.file.path)}`;
       }
@@ -48,6 +53,7 @@ const registerUser = async (req, res) => {
       email,
       password,
       profilePhoto,
+      profilePhotoFeatures,
     });
 
     if (user) {
@@ -56,6 +62,7 @@ const registerUser = async (req, res) => {
         username: user.username,
         email: user.email,
         profilePhoto: user.profilePhoto,
+        profilePhotoFeatures: user.profilePhotoFeatures,
         token: generateToken(user._id),
       });
     } else {
@@ -82,6 +89,7 @@ const loginUser = async (req, res) => {
         username: user.username,
         email: user.email,
         profilePhoto: user.profilePhoto,
+        profilePhotoFeatures: user.profilePhotoFeatures,
         token: generateToken(user._id),
       });
     } else {
@@ -104,6 +112,7 @@ const getUserProfile = async (req, res) => {
         username: user.username,
         email: user.email,
         profilePhoto: user.profilePhoto,
+        profilePhotoFeatures: user.profilePhotoFeatures,
       });
     } else {
       res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
@@ -122,16 +131,20 @@ const updateProfilePhoto = async (req, res) => {
     }
 
     let profilePhoto = '';
+    let profilePhotoFeatures = '';
 
     try {
       // 로컬에 업로드된 파일을 S3에 업로드
       const result = await uploadToS3(req.file);
       profilePhoto = result.Location; // S3에 업로드된 파일의 URL
       
+      // OpenAI API로 이미지 특징 분석
+      profilePhotoFeatures = await analyzeImageFeatures(req.file.path);
+      
       // 로컬 임시 파일 삭제
       fs.unlinkSync(req.file.path);
     } catch (error) {
-      console.error('S3 업로드 오류:', error);
+      console.error('S3 업로드 또는 이미지 분석 오류:', error);
       // S3 업로드 실패 시 로컬 경로 사용
       profilePhoto = `/uploads/${path.basename(req.file.path)}`;
     }
@@ -139,7 +152,10 @@ const updateProfilePhoto = async (req, res) => {
     // 사용자 프로필 사진 업데이트
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
-      { profilePhoto },
+      { 
+        profilePhoto,
+        profilePhotoFeatures,
+      },
       { new: true }
     );
 
@@ -149,6 +165,7 @@ const updateProfilePhoto = async (req, res) => {
         username: updatedUser.username,
         email: updatedUser.email,
         profilePhoto: updatedUser.profilePhoto,
+        profilePhotoFeatures: updatedUser.profilePhotoFeatures,
       });
     } else {
       res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });

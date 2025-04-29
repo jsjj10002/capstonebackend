@@ -1,5 +1,6 @@
 const Diary = require('../models/diaryModel');
 const { uploadToS3 } = require('../config/uploadConfig');
+const { analyzeImageFeatures } = require('../config/openaiConfig');
 const fs = require('fs');
 const path = require('path');
 
@@ -20,6 +21,7 @@ const createDiary = async (req, res) => {
     // 이미지가 업로드된 경우
     if (req.files && req.files.length > 0) {
       const photoUrls = [];
+      const photoFeatures = [];
       
       // 각 파일을 S3에 업로드
       for (const file of req.files) {
@@ -28,16 +30,22 @@ const createDiary = async (req, res) => {
           const result = await uploadToS3(file);
           photoUrls.push(result.Location);
           
+          // OpenAI API로 이미지 특징 분석
+          const features = await analyzeImageFeatures(file.path);
+          photoFeatures.push(features);
+          
           // 로컬 임시 파일 삭제
           fs.unlinkSync(file.path);
         } catch (error) {
-          console.error('S3 업로드 오류:', error);
+          console.error('S3 업로드 또는 이미지 분석 오류:', error);
           // S3 업로드 실패 시 로컬 경로 사용
           photoUrls.push(`/uploads/${path.basename(file.path)}`);
+          photoFeatures.push('이미지 분석에 실패했습니다.');
         }
       }
       
       diaryData.photos = photoUrls;
+      diaryData.photoFeatures = photoFeatures;
     }
     
     // 일기 생성
@@ -119,6 +127,7 @@ const updateDiary = async (req, res) => {
     // 이미지가 업로드된 경우
     if (req.files && req.files.length > 0) {
       const photoUrls = [...diary.photos]; // 기존 사진 URL 복사
+      const photoFeatures = [...diary.photoFeatures]; // 기존 사진 특징 복사
       
       // 각 파일을 S3에 업로드
       for (const file of req.files) {
@@ -127,16 +136,22 @@ const updateDiary = async (req, res) => {
           const result = await uploadToS3(file);
           photoUrls.push(result.Location);
           
+          // OpenAI API로 이미지 특징 분석
+          const features = await analyzeImageFeatures(file.path);
+          photoFeatures.push(features);
+          
           // 로컬 임시 파일 삭제
           fs.unlinkSync(file.path);
         } catch (error) {
-          console.error('S3 업로드 오류:', error);
+          console.error('S3 업로드 또는 이미지 분석 오류:', error);
           // S3 업로드 실패 시 로컬 경로 사용
           photoUrls.push(`/uploads/${path.basename(file.path)}`);
+          photoFeatures.push('이미지 분석에 실패했습니다.');
         }
       }
       
       updateData.photos = photoUrls;
+      updateData.photoFeatures = photoFeatures;
     }
     
     // 일기 업데이트
@@ -184,7 +199,7 @@ const searchDiaries = async (req, res) => {
       return res.status(400).json({ message: '검색어를 입력해주세요.' });
     }
     
-    // 키워드로 일기 검색 (제목, 내용, 태그)
+    // 키워드로 일기 검색 (제목, 내용, 태그, 사진 특징)
     const diaries = await Diary.find({
       $and: [
         { user: req.user._id }, // 본인의 일기만 검색
@@ -193,6 +208,7 @@ const searchDiaries = async (req, res) => {
             { title: { $regex: keyword, $options: 'i' } },
             { content: { $regex: keyword, $options: 'i' } },
             { tags: { $regex: keyword, $options: 'i' } },
+            { photoFeatures: { $regex: keyword, $options: 'i' } }, // 사진 특징으로도 검색
           ],
         },
       ],

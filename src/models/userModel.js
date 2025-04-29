@@ -29,6 +29,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    profilePhotoFeatures: {
+      type: String, // OpenAI API로 분석한 프로필 사진 특징
+      default: '',
+    },
     createdAt: {
       type: Date,
       default: Date.now,
