@@ -108,4 +108,82 @@ const analyzeImageFeatures = async (imagePath) => {
   }
 };
 
-module.exports = { analyzeImageFeatures }; 
+/**
+ * 일기 내용을 분석하여 태그와 무드를 추출하는 함수
+ * @param {string} title - 일기 제목
+ * @param {string} content - 일기 내용
+ * @returns {Promise<Object>} - 분석된 태그와 무드 정보
+ */
+const analyzeDiaryContent = async (title, content) => {
+  try {
+    // OpenAI API 호출
+    const response = await openai.responses.create({
+      model: "o4-mini",
+      input: [
+        {
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": `목표: 주어진 일기의 제목과 내용을 분석하여 관련 태그와 무드를 한국어로 추출합니다.
+
+              분석 및 포함할 요소:
+              
+              태그 (tags):
+              - 장소: 일기에 언급된 장소 (예: 카페, 학교, 공원, 집, 회사)
+              - 시간대: 일기에 언급된 시간대 (예: 아침, 오후, 저녁, 밤, 주말)
+              - 활동: 일기에 언급된 주요 활동 (예: 공부, 운동, 쇼핑, 여행, 식사)
+              - 인물: 일기에 언급된 인물 관계 (예: 친구, 가족, 연인, 동료)
+              - 이벤트: 일기에 언급된 특별한 이벤트 (예: 생일, 여행, 시험, 모임)
+              - 날씨: 일기에 언급된 날씨 상태 (예: 맑음, 비, 눈, 구름)
+              
+              무드 (mood):
+              - 감정 상태: 일기에서 표현된 주요 감정 (예: 행복, 슬픔, 화남, 불안, 평온, 흥분, 지침)
+              - 정서적 분위기: 일기 전체에서 느껴지는 분위기 (예: 긍정적, 부정적, 중립적, 혼란스러움)
+              
+              출력 형식:
+              JSON 형태로 아래와 같이 출력합니다:
+              {
+                "tags": ["태그1", "태그2", "태그3", ...],
+                "mood": "주요 감정 상태"
+              }
+              
+              분석된 모든 태그는 단어 또는 짧은 구 형태로 제공하고, 무드는 가장 두드러진 하나의 감정 상태만 선택합니다.`
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": `제목: ${title}\n\n내용: ${content}`
+            }
+          ]
+        }
+      ],
+      text:{
+        "format":{
+            "type": "text"
+        }
+      },
+      reasoning: {
+        "effort": "high"
+      },
+      tools: [],
+      store: true
+    });
+
+    // 응답에서 생성된 텍스트 추출 및 JSON 파싱
+    const analysisResult = JSON.parse(response.output_text);
+    return analysisResult;
+  } catch (error) {
+    console.error('일기 내용 분석 오류:', error);
+    return {
+      tags: [],
+      mood: '알 수 없음'
+    };
+  }
+};
+
+module.exports = { analyzeImageFeatures, analyzeDiaryContent }; 

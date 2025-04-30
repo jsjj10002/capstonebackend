@@ -1,6 +1,6 @@
 const Diary = require('../models/diaryModel');
 const { uploadToS3 } = require('../config/uploadConfig');
-const { analyzeImageFeatures } = require('../config/openaiConfig');
+const { analyzeImageFeatures, analyzeDiaryContent } = require('../config/openaiConfig');
 const fs = require('fs');
 const path = require('path');
 
@@ -14,9 +14,34 @@ const createDiary = async (req, res) => {
       user: req.user._id,
       title,
       content,
-      mood: mood || '기타',
-      tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
     };
+    
+    // 항상 일기 내용 분석 수행 (사용자 입력 유무에 관계없이)
+    try {
+      const analysisResult = await analyzeDiaryContent(title, content);
+      
+      // 무드 처리: 사용자 입력이 있으면 그대로 사용, 없으면 분석 결과 사용
+      if (mood) {
+        diaryData.mood = mood;
+      } else {
+        diaryData.mood = analysisResult.mood || '기타';
+      }
+      
+      // 태그 처리: 사용자 입력이 있으면 분석 결과와 병합, 없으면 분석 결과만 사용
+      let userTags = [];
+      if (tags) {
+        userTags = tags.split(',').map(tag => tag.trim());
+      }
+      
+      // 분석된 태그와 사용자 태그 병합 (중복 제거)
+      const combinedTags = [...new Set([...userTags, ...(analysisResult.tags || [])])];
+      diaryData.tags = combinedTags;
+    } catch (error) {
+      console.error('일기 내용 분석 오류:', error);
+      // 분석 실패 시 기본값 설정
+      diaryData.mood = mood || '기타';
+      diaryData.tags = tags ? tags.split(',').map(tag => tag.trim()) : [];
+    }
     
     // 이미지가 업로드된 경우
     if (req.files && req.files.length > 0) {
@@ -116,12 +141,36 @@ const updateDiary = async (req, res) => {
     const updateData = {
       title: title || diary.title,
       content: content || diary.content,
-      mood: mood || diary.mood,
     };
     
-    // 태그 업데이트
-    if (tags) {
-      updateData.tags = tags.split(',').map(tag => tag.trim());
+    // 항상 일기 내용 분석 수행 (사용자 입력 유무에 관계없이)
+    try {
+      const titleToAnalyze = title || diary.title;
+      const contentToAnalyze = content || diary.content;
+      const analysisResult = await analyzeDiaryContent(titleToAnalyze, contentToAnalyze);
+      
+      // 무드 처리: 사용자 입력이 있으면 그대로 사용, 없으면 분석 결과 또는 기존 값 사용
+      if (mood) {
+        updateData.mood = mood;
+      } else {
+        updateData.mood = analysisResult.mood || diary.mood || '기타';
+      }
+      
+      // 태그 처리: 사용자 입력이 있으면 분석 결과와 병합, 없으면 분석 결과와 기존 태그 병합
+      let userTags = [];
+      if (tags) {
+        userTags = tags.split(',').map(tag => tag.trim());
+      }
+      
+      // 분석된 태그, 사용자 태그, 기존 태그 병합 (중복 제거)
+      const existingTags = tags ? [] : (diary.tags || []);
+      const combinedTags = [...new Set([...userTags, ...existingTags, ...(analysisResult.tags || [])])];
+      updateData.tags = combinedTags;
+    } catch (error) {
+      console.error('일기 내용 분석 오류:', error);
+      // 분석 실패 시 기존 값 또는 기본값 사용
+      updateData.mood = mood || diary.mood || '기타';
+      updateData.tags = tags ? tags.split(',').map(tag => tag.trim()) : diary.tags || [];
     }
     
     // 이미지가 업로드된 경우
