@@ -47,6 +47,7 @@ const s3 = new AWS.S3({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   region: process.env.AWS_REGION,
+  correctClockSkew: true  // 시간 차이 자동 보정 기능correctClockSkew: true  // 시간 차이 자동 보정 기능
 });
 
 // S3에 파일 업로드 함수

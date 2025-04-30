@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>백엔드 API 테스트</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .section {
+      margin-bottom: 30px;
+      border: 1px solid #ddd;
+      padding: 20px;
+      border-radius: 5px;
+    }
+    h2 {
+      background-color: #f5f5f5;
+      padding: 10px;
+      margin-top: 0;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 5px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .result {
+      margin-top: 15px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+      min-height: 50px;
+      white-space: pre-wrap;
+    }
+    .tab {
+      overflow: hidden;
+      border: 1px solid #ccc;
+      background-color: #f1f1f1;
+    }
+    .tab button {
+      background-color: inherit;
+      float: left;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      padding: 14px 16px;
+      transition: 0.3s;
+      color: black;
+    }
+    .tab button:hover {
+      background-color: #ddd;
+    }
+    .tab button.active {
+      background-color: #ccc;
+    }
+    .tabcontent {
+      display: none;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-top: none;
+    }
+    .show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>일기 앱 API 테스트</h1>
+    
+    <div class="tab">
+      <button class="tablinks active" onclick="openTab(event, 'userSection')">사용자 관리</button>
+      <button class="tablinks" onclick="openTab(event, 'diarySection')">일기 관리</button>
+      <button class="tablinks" onclick="openTab(event, 'peopleSection')">사람 관리</button>
+    </div>
+    
+    <div id="userSection" class="tabcontent show">
+      <div class="section">
+        <h2>회원가입 (POST /api/users/register)</h2>
+        <div class="form-group">
+          <label for="registerUsername">사용자 이름:</label>
+          <input type="text" id="registerUsername" placeholder="사용자 이름">
+        </div>
+        <div class="form-group">
+          <label for="registerEmail">이메일:</label>
+          <input type="email" id="registerEmail" placeholder="이메일">
+        </div>
+        <div class="form-group">
+          <label for="registerPassword">비밀번호:</label>
+          <input type="password" id="registerPassword" placeholder="비밀번호 (최소 6자)">
+        </div>
+        <div class="form-group">
+          <label for="registerProfilePhoto">프로필 사진:</label>
+          <input type="file" id="registerProfilePhoto" accept="image/*">
+        </div>
+        <button onclick="registerUser()">회원가입</button>
+        <div id="registerResult" class="result"></div>
+      </div>
+      
+      <div class="section">
+        <h2>로그인 (POST /api/users/login)</h2>
+        <div class="form-group">
+          <label for="loginEmail">이메일:</label>
+          <input type="email" id="loginEmail" placeholder="이메일">
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">비밀번호:</label>
+          <input type="password" id="loginPassword" placeholder="비밀번호">
+        </div>
+        <button onclick="loginUser()">로그인</button>
+        <div id="loginResult" class="result"></div>
+      </div>
+      
+      <div class="section">
+        <h2>프로필 조회 (GET /api/users/profile)</h2>
+        <button onclick="getUserProfile()">내 프로필 조회</button>
+        <div id="profileResult" class="result"></div>
+      </div>
+      
+      <div class="section">
+        <h2>프로필 사진 업데이트 (PUT /api/users/profile/photo)</h2>
+        <div class="form-group">
+          <label for="updateProfilePhoto">새 프로필 사진:</label>
+          <input type="file" id="updateProfilePhoto" accept="image/*">
+        </div>
+        <button onclick="updateUserProfilePhoto()">프로필 사진 업데이트</button>
+        <div id="updateProfileResult" class="result"></div>
+      </div>
+    </div>
+    
+    <div id="diarySection" class="tabcontent">
+      <div class="section">
+        <h2>일기 작성 (POST /api/diaries)</h2>
+        <div class="form-group">
+          <label for="diaryTitle">제목:</label>
+          <input type="text" id="diaryTitle" placeholder="일기 제목">
+        </div>
+        <div class="form-group">
+          <label for="diaryContent">내용:</label>
+          <textarea id="diaryContent" rows="5" placeholder="일기 내용"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="diaryMood">기분:</label>
+          <select id="diaryMood">
+            <option value="행복">행복</option>
+            <option value="슬픔">슬픔</option>
+            <option value="분노">분노</option>
+            <option value="불안">불안</option>
+            <option value="평온">평온</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="diaryTags">태그 (쉼표로 구분):</label>
+          <input type="text" id="diaryTags" placeholder="예: 일상, 여행, 가족">
+        </div>
+        <div class="form-group">
+          <label for="diaryPhotos">사진 (최대 5개):</label>
+          <input type="file" id="diaryPhotos" accept="image/*" multiple>
+        </div>
+        <button onclick="createDiary()">일기 작성</button>
+        <div id="createDiaryResult" class="result"></div>
+      </div>
+      
+      <div class="section">
+        <h2>내 일기 목록 조회 (GET /api/diaries)</h2>
+        <button onclick="getMyDiaries()">내 일기 목록 조회</button>
+        <div id="myDiariesResult" class="result"></div>
+      </div>
+      
+      <div class="section">
+        <h2>일기 검색 (GET /api/diaries/search)</h2>
+        <div class="form-group">
+          <label for="diarySearchKeyword">검색어:</label>
+          <input type="text" id="diarySearchKeyword" placeholder="검색어">
+        </div>
+        <button onclick="searchDiaries()">일기 검색</button>
+        <div id="searchDiariesResult" class="result"></div>
+      </div>
+      
+      <div class="section">
+        <h2>특정 일기 조회/수정/삭제</h2>
+        <div class="form-group">
+          <label for="diaryId">일기 ID:</label>
+          <input type="text" id="diaryId" placeholder="일기 ID">
+        </div>
+        <button onclick="getDiaryById()">일기 조회</button>
+        <div id="getDiaryResult" class="result"></div>
+        
+        <div style="margin-top: 20px;">
+          <div class="form-group">
+            <label for="updateDiaryTitle">제목:</label>
+            <input type="text" id="updateDiaryTitle" placeholder="수정할 제목">
+          </div>
+          <div class="form-group">
+            <label for="updateDiaryContent">내용:</label>
+            <textarea id="updateDiaryContent" rows="5" placeholder="수정할 내용"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="updateDiaryMood">기분:</label>
+            <select id="updateDiaryMood">
+              <option value="행복">행복</option>
+              <option value="슬픔">슬픔</option>
+              <option value="분노">분노</option>
+              <option value="불안">불안</option>
+              <option value="평온">평온</option>
+              <option value="기타">기타</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="updateDiaryTags">태그:</label>
+            <input type="text" id="updateDiaryTags" placeholder="수정할 태그 (쉼표로 구분)">
+          </div>
+          <div class="form-group">
+            <label for="updateDiaryPhotos">추가 사진:</label>
+            <input type="file" id="updateDiaryPhotos" accept="image/*" multiple>
+          </div>
+          <button onclick="updateDiary()">일기 수정</button>
+          <div id="updateDiaryResult" class="result"></div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+          <button onclick="deleteDiary()">일기 삭제</button>
+          <div id="deleteDiaryResult" class="result"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="peopleSection" class="tabcontent">
+      <div class="section">
+        <h2>사람 추가 (POST /api/people)</h2>
+        <div class="form-group">
+          <label for="personName">이름:</label>
+          <input type="text" id="personName" placeholder="이름">
+        </div>
+        <div class="form-group">
+          <label for="personRelation">관계:</label>
+          <select id="personRelation">
+            <option value="가족">가족</option>
+            <option value="친구">친구</option>
+            <option value="동료">동료</option>
+            <option value="지인">지인</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="personNotes">메모:</label>
+          <textarea id="personNotes" rows="3" placeholder="메모"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="personPhoto">사진:</label>
+          <input type="file" id="personPhoto" accept="image/*">
+        </div>
+        <button onclick="addPerson()">사람 추가</button>
+        <div id="addPersonResult" class="result"></div>
+      </div>
+      
+      <div class="section">
+        <h2>내가 추가한 사람 목록 조회 (GET /api/people)</h2>
+        <button onclick="getMyPeople()">사람 목록 조회</button>
+        <div id="myPeopleResult" class="result"></div>
+      </div>
+      
+      <div class="section">
+        <h2>사람 검색 (GET /api/people/search)</h2>
+        <div class="form-group">
+          <label for="personSearchKeyword">검색어:</label>
+          <input type="text" id="personSearchKeyword" placeholder="검색어">
+        </div>
+        <button onclick="searchPeople()">사람 검색</button>
+        <div id="searchPeopleResult" class="result"></div>
+      </div>
+      
+      <div class="section">
+        <h2>특정 사람 조회/수정/삭제</h2>
+        <div class="form-group">
+          <label for="personId">사람 ID:</label>
+          <input type="text" id="personId" placeholder="사람 ID">
+        </div>
+        <button onclick="getPersonById()">사람 조회</button>
+        <div id="getPersonResult" class="result"></div>
+        
+        <div style="margin-top: 20px;">
+          <div class="form-group">
+            <label for="updatePersonName">이름:</label>
+            <input type="text" id="updatePersonName" placeholder="수정할 이름">
+          </div>
+          <div class="form-group">
+            <label for="updatePersonRelation">관계:</label>
+            <select id="updatePersonRelation">
+              <option value="가족">가족</option>
+              <option value="친구">친구</option>
+              <option value="동료">동료</option>
+              <option value="지인">지인</option>
+              <option value="기타">기타</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="updatePersonNotes">메모:</label>
+            <textarea id="updatePersonNotes" rows="3" placeholder="수정할 메모"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="updatePersonPhoto">새 사진:</label>
+            <input type="file" id="updatePersonPhoto" accept="image/*">
+          </div>
+          <button onclick="updatePerson()">사람 정보 수정</button>
+          <div id="updatePersonResult" class="result"></div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+          <button onclick="deletePerson()">사람 삭제</button>
+          <div id="deletePersonResult" class="result"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // API 기본 URL
+    const API_URL = 'http://localhost:5000/api';
+    let authToken = localStorage.getItem('authToken');
+    
+    // 탭 기능
+    function openTab(evt, tabName) {
+      const tabcontent = document.getElementsByClassName("tabcontent");
+      for (let i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+      
+      const tablinks = document.getElementsByClassName("tablinks");
+      for (let i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+      
+      document.getElementById(tabName).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+    
+    // 사용자 관리 함수들
+    async function registerUser() {
+      try {
+        const username = document.getElementById('registerUsername').value;
+        const email = document.getElementById('registerEmail').value;
+        const password = document.getElementById('registerPassword').value;
+        const profilePhoto = document.getElementById('registerProfilePhoto').files[0];
+        
+        const formData = new FormData();
+        formData.append('username', username);
+        formData.append('email', email);
+        formData.append('password', password);
+        if (profilePhoto) {
+          formData.append('profilePhoto', profilePhoto);
+        }
+        
+        const response = await fetch(`${API_URL}/users/register`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        const data = await response.json();
+        document.getElementById('registerResult').textContent = JSON.stringify(data, null, 2);
+        
+        if (response.ok && data.token) {
+          localStorage.setItem('authToken', data.token);
+          authToken = data.token;
+          alert('회원가입 성공! 자동으로 로그인되었습니다.');
+        }
+      } catch (err) {
+        document.getElementById('registerResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function loginUser() {
+      try {
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        
+        const response = await fetch(`${API_URL}/users/login`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        document.getElementById('loginResult').textContent = JSON.stringify(data, null, 2);
+        
+        if (response.ok && data.token) {
+          localStorage.setItem('authToken', data.token);
+          authToken = data.token;
+          alert('로그인 성공!');
+        }
+      } catch (err) {
+        document.getElementById('loginResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function getUserProfile() {
+      try {
+        if (!authToken) {
+          document.getElementById('profileResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const response = await fetch(`${API_URL}/users/profile`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        document.getElementById('profileResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('profileResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function updateUserProfilePhoto() {
+      try {
+        if (!authToken) {
+          document.getElementById('updateProfileResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const profilePhoto = document.getElementById('updateProfilePhoto').files[0];
+        if (!profilePhoto) {
+          document.getElementById('updateProfileResult').textContent = '프로필 사진을 선택해주세요.';
+          return;
+        }
+        
+        const formData = new FormData();
+        formData.append('profilePhoto', profilePhoto);
+        
+        const response = await fetch(`${API_URL}/users/profile/photo`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${authToken}` },
+          body: formData
+        });
+        
+        const data = await response.json();
+        document.getElementById('updateProfileResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('updateProfileResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    // 일기 관리 함수들
+    async function createDiary() {
+      try {
+        if (!authToken) {
+          document.getElementById('createDiaryResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const title = document.getElementById('diaryTitle').value;
+        const content = document.getElementById('diaryContent').value;
+        const mood = document.getElementById('diaryMood').value;
+        const tags = document.getElementById('diaryTags').value;
+        const photos = document.getElementById('diaryPhotos').files;
+        
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('content', content);
+        formData.append('mood', mood);
+        formData.append('tags', tags);
+        
+        for (let i = 0; i < photos.length; i++) {
+          formData.append('photos', photos[i]);
+        }
+        
+        const response = await fetch(`${API_URL}/diaries`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` },
+          body: formData
+        });
+        
+        const data = await response.json();
+        document.getElementById('createDiaryResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('createDiaryResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function getMyDiaries() {
+      try {
+        if (!authToken) {
+          document.getElementById('myDiariesResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const response = await fetch(`${API_URL}/diaries`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        document.getElementById('myDiariesResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('myDiariesResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function searchDiaries() {
+      try {
+        if (!authToken) {
+          document.getElementById('searchDiariesResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const keyword = document.getElementById('diarySearchKeyword').value;
+        
+        const response = await fetch(`${API_URL}/diaries/search?keyword=${keyword}`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        document.getElementById('searchDiariesResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('searchDiariesResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function getDiaryById() {
+      try {
+        if (!authToken) {
+          document.getElementById('getDiaryResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const id = document.getElementById('diaryId').value;
+        if (!id) {
+          document.getElementById('getDiaryResult').textContent = '일기 ID를 입력해주세요.';
+          return;
+        }
+        
+        const response = await fetch(`${API_URL}/diaries/${id}`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        document.getElementById('getDiaryResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('getDiaryResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function updateDiary() {
+      try {
+        if (!authToken) {
+          document.getElementById('updateDiaryResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const id = document.getElementById('diaryId').value;
+        if (!id) {
+          document.getElementById('updateDiaryResult').textContent = '일기 ID를 입력해주세요.';
+          return;
+        }
+        
+        const title = document.getElementById('updateDiaryTitle').value;
+        const content = document.getElementById('updateDiaryContent').value;
+        const mood = document.getElementById('updateDiaryMood').value;
+        const tags = document.getElementById('updateDiaryTags').value;
+        const photos = document.getElementById('updateDiaryPhotos').files;
+        
+        const formData = new FormData();
+        if (title) formData.append('title', title);
+        if (content) formData.append('content', content);
+        if (mood) formData.append('mood', mood);
+        if (tags) formData.append('tags', tags);
+        
+        for (let i = 0; i < photos.length; i++) {
+          formData.append('photos', photos[i]);
+        }
+        
+        const response = await fetch(`${API_URL}/diaries/${id}`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${authToken}` },
+          body: formData
+        });
+        
+        const data = await response.json();
+        document.getElementById('updateDiaryResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('updateDiaryResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function deleteDiary() {
+      try {
+        if (!authToken) {
+          document.getElementById('deleteDiaryResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const id = document.getElementById('diaryId').value;
+        if (!id) {
+          document.getElementById('deleteDiaryResult').textContent = '일기 ID를 입력해주세요.';
+          return;
+        }
+        
+        const response = await fetch(`${API_URL}/diaries/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        document.getElementById('deleteDiaryResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('deleteDiaryResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    // 사람 관리 함수들
+    async function addPerson() {
+      try {
+        if (!authToken) {
+          document.getElementById('addPersonResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const name = document.getElementById('personName').value;
+        const relation = document.getElementById('personRelation').value;
+        const notes = document.getElementById('personNotes').value;
+        const photo = document.getElementById('personPhoto').files[0];
+        
+        if (!name || !photo) {
+          document.getElementById('addPersonResult').textContent = '이름과 사진은 필수입니다.';
+          return;
+        }
+        
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('relation', relation);
+        formData.append('notes', notes);
+        formData.append('photo', photo);
+        
+        const response = await fetch(`${API_URL}/people`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` },
+          body: formData
+        });
+        
+        const data = await response.json();
+        document.getElementById('addPersonResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('addPersonResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function getMyPeople() {
+      try {
+        if (!authToken) {
+          document.getElementById('myPeopleResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const response = await fetch(`${API_URL}/people`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        document.getElementById('myPeopleResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('myPeopleResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function searchPeople() {
+      try {
+        if (!authToken) {
+          document.getElementById('searchPeopleResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const keyword = document.getElementById('personSearchKeyword').value;
+        
+        const response = await fetch(`${API_URL}/people/search?keyword=${keyword}`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        document.getElementById('searchPeopleResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('searchPeopleResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function getPersonById() {
+      try {
+        if (!authToken) {
+          document.getElementById('getPersonResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const id = document.getElementById('personId').value;
+        if (!id) {
+          document.getElementById('getPersonResult').textContent = '사람 ID를 입력해주세요.';
+          return;
+        }
+        
+        const response = await fetch(`${API_URL}/people/${id}`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        document.getElementById('getPersonResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('getPersonResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function updatePerson() {
+      try {
+        if (!authToken) {
+          document.getElementById('updatePersonResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const id = document.getElementById('personId').value;
+        if (!id) {
+          document.getElementById('updatePersonResult').textContent = '사람 ID를 입력해주세요.';
+          return;
+        }
+        
+        const name = document.getElementById('updatePersonName').value;
+        const relation = document.getElementById('updatePersonRelation').value;
+        const notes = document.getElementById('updatePersonNotes').value;
+        const photo = document.getElementById('updatePersonPhoto').files[0];
+        
+        const formData = new FormData();
+        if (name) formData.append('name', name);
+        if (relation) formData.append('relation', relation);
+        if (notes) formData.append('notes', notes);
+        if (photo) formData.append('photo', photo);
+        
+        const response = await fetch(`${API_URL}/people/${id}`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${authToken}` },
+          body: formData
+        });
+        
+        const data = await response.json();
+        document.getElementById('updatePersonResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('updatePersonResult').textContent = `오류: ${err.message}`;
+      }
+    }
+    
+    async function deletePerson() {
+      try {
+        if (!authToken) {
+          document.getElementById('deletePersonResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const id = document.getElementById('personId').value;
+        if (!id) {
+          document.getElementById('deletePersonResult').textContent = '사람 ID를 입력해주세요.';
+          return;
+        }
+        
+        const response = await fetch(`${API_URL}/people/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        document.getElementById('deletePersonResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('deletePersonResult').textContent = `오류: ${err.message}`;
+      }
+    }
+  </script>
+</body>
+</html>
