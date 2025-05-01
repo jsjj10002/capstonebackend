@@ -26,7 +26,6 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 - 사용자 인증 및 권한 관리 구현했다
 - 일기 CRUD 기능 구현했다
 - 이미지 업로드 기능 구현했다
-- OpenAI API를 활용한 이미지 특징 분석 기능 추가했다
 - 주변 사람들의 정보 및 사진 관리 기능 추가했다
 - 일기 내용 자동 분석으로 태그 및 무드 추출 기능 추가했다
 
@@ -45,18 +44,7 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 - 포트 설정했다
 - OpenAI API 키 설정했다
 
-### 4. 이미지 특징 분석 프롬프트
-
-- GPT-o4-mini 모델 활용한 이미지 특징 포착 방식을 사용한다
-- reasoning 모델 사용해 더 정교한 분석을 수행한다
-- 얼굴 특징 분석: 눈, 코, 입의 형태/색상/위치 분석한다
-- 헤어스타일 분석: 길이, 색상, 스타일링 분석한다
-- 피부톤 및 얼굴형 분석: 피부 색조, 얼굴 윤곽 분석한다
-- 기본 인적 특성 추정: 성별, 인종, 나이 추정한다
-- 특징을 종합한 단일 문장으로 출력한다
-- 검색 및 인물 특성 파악에 활용한다
-
-### 5. 일기 내용 분석 프롬프트
+### 4. 일기 내용 분석 프롬프트
 
 - GPT-o4-mini 모델을 활용한 일기 텍스트 분석을 수행한다
 - 일기 제목과 내용에서 자동으로 태그 추출한다
@@ -68,6 +56,13 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
   - 날씨: 일기에 언급된 날씨 상태 (맑음, 비, 눈 등)
 - 일기 내용에서 감정 상태(무드) 자동 분석한다
 - 사용자 입력 태그와 자동 분석 태그 병합 기능을 제공한다
+
+### 5. 이미지 프롬프트 생성 기능
+
+- GPT-o4-mini 모델을 활용한 일기 내용 기반 이미지 생성 프롬프트 자동 생성
+- 일기의 장면만 묘사하는 방식으로 프롬프트 생성
+- 일기의 시간, 장소, 분위기, 활동 등을 반영한 생생한 장면 묘사
+- 인물의 얼굴 특징은 포함하지 않고 장면 위주로 프롬프트 구성
 </details>
 
 <details>
@@ -75,7 +70,7 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 
 ### 1. 사용자 관리
 
-- 회원가입 (얼굴 사진 업로드 포함) 기능 제공한다
+- 회원가입 (프로필 사진 업로드 포함) 기능 제공한다
 - 로그인/인증 기능 제공한다
 - 프로필 조회 및 업데이트 기능 제공한다
 
@@ -94,15 +89,11 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 - 사람 정보 조회 (목록/개별) 기능 제공한다
 - 사람 정보 수정 및 삭제 기능 제공한다
 - 사람 검색 기능 제공한다
-- OpenAI API를 활용한 이미지 특징 분석 기능 제공한다
-- 일기 내용 자동 분석을 통한 태그 및 감정 추출 기능 제공한다
-- 일기 내용을 분석하여 이미지 생성 프롬프트 제공 기능 추가했다
-- 분석 결과를 기반으로 한 검색 기능 강화했다
 
 ### 4. AI 기반 분석
 
-- OpenAI API를 활용한 이미지 특징 분석 기능 제공한다
 - 일기 내용 자동 분석을 통한 태그 및 감정 추출 기능 제공한다
+- 일기 내용을 기반으로 장면 중심 이미지 생성 프롬프트 제공 기능
 - 분석 결과를 기반으로 한 검색 기능 강화했다
 
 ### 5. 파일 업로드
@@ -153,11 +144,11 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 
 | API 엔드포인트 | 요청 데이터 | 응답 데이터 |
 |---------------|------------|------------|
-| POST /api/users/register | username, email, password, profilePhoto(선택) | _id, username, email, profilePhoto, profilePhotoFeatures, token |
-| POST /api/users/login | email, password | _id, username, email, profilePhoto, profilePhotoFeatures, token |
-| GET /api/users/profile | Authorization 헤더(Bearer 토큰) | _id, username, email, profilePhoto, profilePhotoFeatures |
-| PUT /api/users/profile | Authorization 헤더(Bearer 토큰), username(선택), email(선택) | _id, username, email, profilePhoto, profilePhotoFeatures |
-| PUT /api/users/profile/photo | Authorization 헤더(Bearer 토큰), profilePhoto(파일) | _id, username, email, profilePhoto, profilePhotoFeatures |
+| POST /api/users/register | username, email, password, profilePhoto(선택) | _id, username, email, profilePhoto, token |
+| POST /api/users/login | email, password | _id, username, email, profilePhoto, token |
+| GET /api/users/profile | Authorization 헤더(Bearer 토큰) | _id, username, email, profilePhoto |
+| PUT /api/users/profile | Authorization 헤더(Bearer 토큰), username(선택), email(선택) | _id, username, email, profilePhoto |
+| PUT /api/users/profile/photo | Authorization 헤더(Bearer 토큰), profilePhoto(파일) | _id, username, email, profilePhoto |
 </details>
 
 <details>
@@ -165,7 +156,7 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 
 | API 엔드포인트 | 요청 데이터 | 응답 데이터 |
 |---------------|------------|------------|
-| POST /api/people | Authorization 헤더(Bearer 토큰), name, relation(선택), notes(선택), photo(필수) | _id, user, name, relation, photo, photoFeatures, notes, createdAt, updatedAt |
+| POST /api/people | Authorization 헤더(Bearer 토큰), name, relation(선택), notes(선택), photo(필수) | _id, user, name, relation, photo, notes, createdAt, updatedAt |
 | GET /api/people | Authorization 헤더(Bearer 토큰) | 인물 객체 배열 |
 | GET /api/people/search | Authorization 헤더(Bearer 토큰), keyword(쿼리 파라미터) | 검색 결과 인물 객체 배열 |
 | GET /api/people/filter | Authorization 헤더(Bearer 토큰), relation(쿼리 파라미터) | 필터링된 인물 객체 배열 |
@@ -179,7 +170,7 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 
 | API 엔드포인트 | 요청 데이터 | 응답 데이터 |
 |---------------|------------|------------|
-| POST /api/diaries | Authorization 헤더(Bearer 토큰), title, content, mood(선택), tags(선택), photos(선택) | _id, user, title, content, mood, photos, photoFeatures, tags, createdAt, updatedAt |
+| POST /api/diaries | Authorization 헤더(Bearer 토큰), title, content, mood(선택), tags(선택), photos(선택) | _id, user, title, content, mood, photos, tags, createdAt, updatedAt |
 | GET /api/diaries | Authorization 헤더(Bearer 토큰) | 일기 객체 배열 |
 | GET /api/diaries/search | Authorization 헤더(Bearer 토큰), keyword(쿼리 파라미터) | 검색 결과 일기 객체 배열 |
 | GET /api/diaries/filter | Authorization 헤더(Bearer 토큰), tags(선택), mood(선택), startDate(선택), endDate(선택) | 필터링된 일기 객체 배열 |
@@ -224,21 +215,6 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 ## AI 분석 예시
 
 <details>
-<summary>🖼️ 인물 묘사 분석 예시</summary>
-
-AI는 업로드된 인물 사진을 분석하여 다음과 같이 주요 특징을 묘사한다. 이 정보는 인물 검색 및 관리에 활용할 수 있다.
-
-**입력 이미지 예시:**
-
-![인물 사진 예시](pictures/프로필예_카리나.jpg)
-
-**분석 결과:**
-
-![인물 묘사 결과](pictures/인물묘사%20결과.png)
-
-</details>
-
-<details>
 <summary>📝 일기 내용 태깅 예시</summary>
 
 일기 작성 시 AI가 자동으로 내용을 분석하여 관련 태그와 감정(무드)을 추출한다. 이를 통해 사용자는 과거의 기록을 더 쉽게 검색하고 분류할 수 있다.
@@ -256,7 +232,12 @@ AI는 업로드된 인물 사진을 분석하여 다음과 같이 주요 특징�
 <details>
 <summary>✨ 이미지 프롬프트 생성 예시</summary>
 
-특정 일기의 내용을 기반으로 AI가 이미지 생성을 위한 프롬프트를 자동으로 만들어준다. 이 프롬프트를 활용하여 사용자는 일기와 관련된 이미지를 생성할 수 있다.
+특정 일기의 내용을 기반으로 AI가 이미지 생성을 위한 프롬프트를 자동으로 만들어준다. 이 프롬프트는 장면 묘사에 중점을 두어 일기의 내용과 분위기를 시각적으로 표현할 수 있도록 구성된다.
+
+**프롬프트 생성 특징:**
+- 일기의 장소, 시간, 분위기, 활동을 중심으로 표현
+- 인물이 등장하는 경우 얼굴 특징 없이 상황 중심으로 묘사
+- 사실적인 사진 스타일로 표현 가능한 영어 프롬프트 생성
 
 **프롬프트 생성 결과:**
 

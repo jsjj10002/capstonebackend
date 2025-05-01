@@ -1,7 +1,7 @@
 const Diary = require('../models/diaryModel');
 const User = require('../models/userModel');
 const { uploadToS3 } = require('../config/uploadConfig');
-const { analyzeImageFeatures, analyzeDiaryContent, generateImagePrompt } = require('../config/openaiConfig');
+const { analyzeDiaryContent, generateImagePrompt } = require('../config/openaiConfig');
 const fs = require('fs');
 const path = require('path');
 
@@ -10,68 +10,38 @@ const createDiary = async (req, res) => {
   try {
     const { title, content, mood, tags } = req.body;
     
-    // 기본 일기 데이터
+    // 기본 일기 데이터 구성
     const diaryData = {
       user: req.user._id,
       title,
       content,
+      mood: mood || '기타',
+      tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim())) : [],
+      photos: [],
     };
     
-    // 항상 일기 내용 분석 수행 (사용자 입력 유무에 관계없이)
-    try {
-      const analysisResult = await analyzeDiaryContent(title, content);
-      
-      // 무드 처리: 사용자 입력이 있으면 그대로 사용, 없으면 분석 결과 사용
-      if (mood) {
-        diaryData.mood = mood;
-      } else {
-        diaryData.mood = analysisResult.mood || '기타';
-      }
-      
-      // 태그 처리: 사용자 입력이 있으면 분석 결과와 병합, 없으면 분석 결과만 사용
-      let userTags = [];
-      if (tags) {
-        userTags = tags.split(',').map(tag => tag.trim());
-      }
-      
-      // 분석된 태그와 사용자 태그 병합 (중복 제거)
-      const combinedTags = [...new Set([...userTags, ...(analysisResult.tags || [])])];
-      diaryData.tags = combinedTags;
-    } catch (error) {
-      console.error('일기 내용 분석 오류:', error);
-      // 분석 실패 시 기본값 설정
-      diaryData.mood = mood || '기타';
-      diaryData.tags = tags ? tags.split(',').map(tag => tag.trim()) : [];
+    // 업로드된 사진이 있는 경우 처리
+    if (req.files && req.files.length > 0) {
+      // 사진 URL 추가
+      diaryData.photos = req.files.map(file => `/uploads/${file.filename}`);
     }
     
-    // 이미지가 업로드된 경우
-    if (req.files && req.files.length > 0) {
-      const photoUrls = [];
-      const photoFeatures = [];
-      
-      // 각 파일을 S3에 업로드
-      for (const file of req.files) {
-        try {
-          // S3에 업로드
-          const result = await uploadToS3(file);
-          photoUrls.push(result.Location);
-          
-          // OpenAI API로 이미지 특징 분석
-          const features = await analyzeImageFeatures(file.path);
-          photoFeatures.push(features);
-          
-          // 로컬 임시 파일 삭제
-          fs.unlinkSync(file.path);
-        } catch (error) {
-          console.error('S3 업로드 또는 이미지 분석 오류:', error);
-          // S3 업로드 실패 시 로컬 경로 사용
-          photoUrls.push(`/uploads/${path.basename(file.path)}`);
-          photoFeatures.push('이미지 분석에 실패했습니다.');
+    // 태그와 무드 자동 분석 (입력값이 없는 경우)
+    if (!tags || tags.length === 0 || !mood || mood === '기타') {
+      try {
+        const analysis = await analyzeDiaryContent(title, content);
+        
+        if (!tags || tags.length === 0) {
+          diaryData.tags = analysis.tags;
         }
+        
+        if (!mood || mood === '기타') {
+          diaryData.mood = analysis.mood;
+        }
+      } catch (error) {
+        console.error('일기 내용 분석 오류:', error);
+        // 분석 실패 시에도 일기는 저장 진행
       }
-      
-      diaryData.photos = photoUrls;
-      diaryData.photoFeatures = photoFeatures;
     }
     
     // 일기 생성
@@ -80,21 +50,34 @@ const createDiary = async (req, res) => {
     res.status(201).json(diary);
   } catch (error) {
     console.error('일기 작성 오류:', error);
-    res.status(500).json({ message: '서버 오류: ' + error.message });
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
 };
 
-// 내 모든 일기 조회
-const getMyDiaries = async (req, res) => {
+// 일기 목록 조회
+const getDiaries = async (req, res) => {
   try {
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    // 사용자의 모든 일기 조회 (최신순)
     const diaries = await Diary.find({ user: req.user._id })
-      .sort({ createdAt: -1 }) // 최신순 정렬
-      .exec();
-      
-    res.json(diaries);
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+    
+    // 전체 일기 수
+    const total = await Diary.countDocuments({ user: req.user._id });
+    
+    res.json({
+      diaries,
+      totalPages: Math.ceil(total / Number(limit)),
+      currentPage: Number(page),
+      total,
+    });
   } catch (error) {
-    console.error('일기 조회 오류:', error);
-    res.status(500).json({ message: '서버 오류: ' + error.message });
+    console.error('일기 목록 조회 오류:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
 };
 
@@ -103,20 +86,19 @@ const getDiaryById = async (req, res) => {
   try {
     const diary = await Diary.findById(req.params.id);
     
-    // 일기가 존재하는지 확인
     if (!diary) {
       return res.status(404).json({ message: '일기를 찾을 수 없습니다.' });
     }
     
-    // 자신의 일기인지 확인
+    // 본인 일기만 조회 가능
     if (diary.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: '접근 권한이 없습니다.' });
+      return res.status(403).json({ message: '권한이 없습니다.' });
     }
     
     res.json(diary);
   } catch (error) {
-    console.error('일기 상세 조회 오류:', error);
-    res.status(500).json({ message: '서버 오류: ' + error.message });
+    console.error('일기 조회 오류:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
 };
 
@@ -124,95 +106,70 @@ const getDiaryById = async (req, res) => {
 const updateDiary = async (req, res) => {
   try {
     const { title, content, mood, tags } = req.body;
+    const diary = await Diary.findById(req.params.id);
     
-    // 기존 일기 조회
-    let diary = await Diary.findById(req.params.id);
-    
-    // 일기가 존재하는지 확인
     if (!diary) {
       return res.status(404).json({ message: '일기를 찾을 수 없습니다.' });
     }
     
-    // 자신의 일기인지 확인
+    // 본인 일기만 수정 가능
     if (diary.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: '접근 권한이 없습니다.' });
+      return res.status(403).json({ message: '권한이 없습니다.' });
     }
     
     // 업데이트할 데이터
     const updateData = {
       title: title || diary.title,
       content: content || diary.content,
+      mood: mood || diary.mood,
+      tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim())) : diary.tags,
     };
     
-    // 항상 일기 내용 분석 수행 (사용자 입력 유무에 관계없이)
-    try {
-      const titleToAnalyze = title || diary.title;
-      const contentToAnalyze = content || diary.content;
-      const analysisResult = await analyzeDiaryContent(titleToAnalyze, contentToAnalyze);
-      
-      // 무드 처리: 사용자 입력이 있으면 그대로 사용, 없으면 분석 결과 또는 기존 값 사용
-      if (mood) {
-        updateData.mood = mood;
-      } else {
-        updateData.mood = analysisResult.mood || diary.mood || '기타';
+    // 태그와 무드 자동 분석 (입력값이 없는 경우)
+    if ((!tags || tags.length === 0) || (!mood || mood === '기타')) {
+      try {
+        const analysis = await analyzeDiaryContent(
+          updateData.title,
+          updateData.content
+        );
+        
+        if (!tags || tags.length === 0) {
+          updateData.tags = analysis.tags;
+        }
+        
+        if (!mood || mood === '기타') {
+          updateData.mood = analysis.mood;
+        }
+      } catch (error) {
+        console.error('일기 내용 분석 오류:', error);
+        // 분석 실패 시에도 일기는 저장 진행
       }
-      
-      // 태그 처리: 사용자 입력이 있으면 분석 결과와 병합, 없으면 분석 결과와 기존 태그 병합
-      let userTags = [];
-      if (tags) {
-        userTags = tags.split(',').map(tag => tag.trim());
-      }
-      
-      // 분석된 태그, 사용자 태그, 기존 태그 병합 (중복 제거)
-      const existingTags = tags ? [] : (diary.tags || []);
-      const combinedTags = [...new Set([...userTags, ...existingTags, ...(analysisResult.tags || [])])];
-      updateData.tags = combinedTags;
-    } catch (error) {
-      console.error('일기 내용 분석 오류:', error);
-      // 분석 실패 시 기존 값 또는 기본값 사용
-      updateData.mood = mood || diary.mood || '기타';
-      updateData.tags = tags ? tags.split(',').map(tag => tag.trim()) : diary.tags || [];
     }
     
-    // 이미지가 업로드된 경우
+    // 새 사진이 업로드된 경우
     if (req.files && req.files.length > 0) {
-      const photoUrls = [...diary.photos]; // 기존 사진 URL 복사
-      const photoFeatures = [...diary.photoFeatures]; // 기존 사진 특징 복사
+      // 기존 사진 배열 복제
+      const photos = [...diary.photos];
       
-      // 각 파일을 S3에 업로드
-      for (const file of req.files) {
-        try {
-          // S3에 업로드
-          const result = await uploadToS3(file);
-          photoUrls.push(result.Location);
-          
-          // OpenAI API로 이미지 특징 분석
-          const features = await analyzeImageFeatures(file.path);
-          photoFeatures.push(features);
-          
-          // 로컬 임시 파일 삭제
-          fs.unlinkSync(file.path);
-        } catch (error) {
-          console.error('S3 업로드 또는 이미지 분석 오류:', error);
-          // S3 업로드 실패 시 로컬 경로 사용
-          photoUrls.push(`/uploads/${path.basename(file.path)}`);
-          photoFeatures.push('이미지 분석에 실패했습니다.');
-        }
-      }
+      // 새 사진 추가
+      req.files.forEach(file => {
+        photos.push(`/uploads/${file.filename}`);
+      });
       
-      updateData.photos = photoUrls;
-      updateData.photoFeatures = photoFeatures;
+      updateData.photos = photos;
     }
     
     // 일기 업데이트
-    diary = await Diary.findByIdAndUpdate(req.params.id, updateData, {
-      new: true,
-    });
+    const updatedDiary = await Diary.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    );
     
-    res.json(diary);
+    res.json(updatedDiary);
   } catch (error) {
-    console.error('일기 업데이트 오류:', error);
-    res.status(500).json({ message: '서버 오류: ' + error.message });
+    console.error('일기 수정 오류:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
 };
 
@@ -221,22 +178,20 @@ const deleteDiary = async (req, res) => {
   try {
     const diary = await Diary.findById(req.params.id);
     
-    // 일기가 존재하는지 확인
     if (!diary) {
       return res.status(404).json({ message: '일기를 찾을 수 없습니다.' });
     }
     
-    // 자신의 일기인지 확인
+    // 본인 일기만 삭제 가능
     if (diary.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: '접근 권한이 없습니다.' });
+      return res.status(403).json({ message: '권한이 없습니다.' });
     }
     
-    await diary.deleteOne();
-    
+    await Diary.deleteOne({ _id: req.params.id });
     res.json({ message: '일기가 삭제되었습니다.' });
   } catch (error) {
     console.error('일기 삭제 오류:', error);
-    res.status(500).json({ message: '서버 오류: ' + error.message });
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
 };
 
@@ -249,56 +204,41 @@ const searchDiaries = async (req, res) => {
       return res.status(400).json({ message: '검색어를 입력해주세요.' });
     }
     
-    // 키워드로 일기 검색 (제목, 내용, 태그, 사진 특징)
+    // 제목, 내용, 태그로 검색
     const diaries = await Diary.find({
-      $and: [
-        { user: req.user._id }, // 본인의 일기만 검색
-        {
-          $or: [
-            { title: { $regex: keyword, $options: 'i' } },
-            { content: { $regex: keyword, $options: 'i' } },
-            { tags: { $regex: keyword, $options: 'i' } },
-            { photoFeatures: { $regex: keyword, $options: 'i' } }, // 사진 특징으로도 검색
-          ],
-        },
+      user: req.user._id,
+      $or: [
+        { title: { $regex: keyword, $options: 'i' } },
+        { content: { $regex: keyword, $options: 'i' } },
+        { tags: { $in: [new RegExp(keyword, 'i')] } },
+        { mood: { $regex: keyword, $options: 'i' } }
       ],
     }).sort({ createdAt: -1 });
     
     res.json(diaries);
   } catch (error) {
     console.error('일기 검색 오류:', error);
-    res.status(500).json({ message: '서버 오류: ' + error.message });
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
 };
 
-// 특정 일기로 이미지 생성 프롬프트 생성
-const generateDiaryImagePrompt = async (req, res) => {
+// 일기 내용 기반 이미지 생성 프롬프트 생성
+const generateImagePromptFromDiary = async (req, res) => {
   try {
     const diaryId = req.params.id;
-    
-    // 해당 일기 조회
     const diary = await Diary.findById(diaryId);
     
-    // 일기가 존재하는지 확인
     if (!diary) {
       return res.status(404).json({ message: '일기를 찾을 수 없습니다.' });
     }
     
-    // 자신의 일기인지 확인
+    // 본인 일기만 접근 가능
     if (diary.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: '접근 권한이 없습니다.' });
-    }
-    
-    // 사용자 프로필 조회 (프로필 사진 특징 가져오기)
-    const user = await User.findById(req.user._id);
-    
-    if (!user || !user.profilePhotoFeatures) {
-      return res.status(400).json({ message: '프로필 사진 특징 정보가 없습니다. 프로필 사진을 업로드해주세요.' });
+      return res.status(403).json({ message: '권한이 없습니다.' });
     }
     
     // 이미지 생성 프롬프트 생성
     const prompt = await generateImagePrompt(
-      user.profilePhotoFeatures,
       diary.title,
       diary.content,
       diary.tags,
@@ -308,16 +248,16 @@ const generateDiaryImagePrompt = async (req, res) => {
     res.json({ prompt });
   } catch (error) {
     console.error('이미지 프롬프트 생성 오류:', error);
-    res.status(500).json({ message: '서버 오류: ' + error.message });
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
 };
 
 module.exports = {
   createDiary,
-  getMyDiaries,
+  getDiaries,
   getDiaryById,
   updateDiary,
   deleteDiary,
   searchDiaries,
-  generateDiaryImagePrompt,
+  generateImagePromptFromDiary,
 }; 

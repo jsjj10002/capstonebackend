@@ -21,10 +21,6 @@ const personSchema = new mongoose.Schema(
       type: String, // 사진 URL
       required: [true, '사진은 필수입니다.'],
     },
-    photoFeatures: {
-      type: String, // OpenAI API로 분석한 사진 특징
-      default: '',
-    },
     notes: {
       type: String, // 추가 메모
       default: '',
