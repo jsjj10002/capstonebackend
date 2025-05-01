@@ -7,6 +7,7 @@ const {
   updateDiary,
   deleteDiary,
   searchDiaries,
+  generateDiaryImagePrompt,
 } = require('../controllers/diaryController');
 const { protect } = require('../middleware/authMiddleware');
 const { uploadLocal } = require('../config/uploadConfig');
@@ -25,6 +26,9 @@ router.get('/search', searchDiaries);
 
 // 특정 일기 조회 라우트
 router.get('/:id', getDiaryById);
+
+// 특정 일기의 이미지 생성 프롬프트 생성 라우트
+router.get('/:id/prompt', generateDiaryImagePrompt);
 
 // 일기 수정 라우트
 router.put('/:id', uploadLocal.array('photos', 5), updateDiary);

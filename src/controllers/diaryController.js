@@ -1,6 +1,7 @@
 const Diary = require('../models/diaryModel');
+const User = require('../models/userModel');
 const { uploadToS3 } = require('../config/uploadConfig');
-const { analyzeImageFeatures, analyzeDiaryContent } = require('../config/openaiConfig');
+const { analyzeImageFeatures, analyzeDiaryContent, generateImagePrompt } = require('../config/openaiConfig');
 const fs = require('fs');
 const path = require('path');
 
@@ -270,6 +271,47 @@ const searchDiaries = async (req, res) => {
   }
 };
 
+// 특정 일기로 이미지 생성 프롬프트 생성
+const generateDiaryImagePrompt = async (req, res) => {
+  try {
+    const diaryId = req.params.id;
+    
+    // 해당 일기 조회
+    const diary = await Diary.findById(diaryId);
+    
+    // 일기가 존재하는지 확인
+    if (!diary) {
+      return res.status(404).json({ message: '일기를 찾을 수 없습니다.' });
+    }
+    
+    // 자신의 일기인지 확인
+    if (diary.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: '접근 권한이 없습니다.' });
+    }
+    
+    // 사용자 프로필 조회 (프로필 사진 특징 가져오기)
+    const user = await User.findById(req.user._id);
+    
+    if (!user || !user.profilePhotoFeatures) {
+      return res.status(400).json({ message: '프로필 사진 특징 정보가 없습니다. 프로필 사진을 업로드해주세요.' });
+    }
+    
+    // 이미지 생성 프롬프트 생성
+    const prompt = await generateImagePrompt(
+      user.profilePhotoFeatures,
+      diary.title,
+      diary.content,
+      diary.tags,
+      diary.mood
+    );
+    
+    res.json({ prompt });
+  } catch (error) {
+    console.error('이미지 프롬프트 생성 오류:', error);
+    res.status(500).json({ message: '서버 오류: ' + error.message });
+  }
+};
+
 module.exports = {
   createDiary,
   getMyDiaries,
@@ -277,4 +319,5 @@ module.exports = {
   updateDiary,
   deleteDiary,
   searchDiaries,
+  generateDiaryImagePrompt,
 }; 

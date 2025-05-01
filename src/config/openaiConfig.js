@@ -186,4 +186,104 @@ const analyzeDiaryContent = async (title, content) => {
   }
 };
 
-module.exports = { analyzeImageFeatures, analyzeDiaryContent }; 
+/**
+ * 일기 내용과 사용자 프로필을 바탕으로 이미지 생성 프롬프트 생성 함수
+ * @param {string} profileFeatures - 사용자 프로필 사진 특성
+ * @param {string} diaryTitle - 일기 제목
+ * @param {string} diaryContent - 일기 내용
+ * @param {Array<string>} diaryTags - 일기 태그
+ * @param {string} diaryMood - 일기 무드
+ * @returns {Promise<string>} - 생성된 이미지 프롬프트
+ */
+const generateImagePrompt = async (profileFeatures, diaryTitle, diaryContent, diaryTags, diaryMood) => {
+  try {
+    // OpenAI API 호출
+    const response = await openai.responses.create({
+      model: "o4-mini",
+      input: [
+        {
+          "role": "developer",
+          "content": [
+            {
+              "type": "input_text",
+              "text": `목표: 주어진 사용자 프로필(외모) 특성과 일기 내용을 바탕으로 Stable Diffusion에 사용할 이미지 생성 프롬프트를 만듭니다.
+
+              분석 및 포함할 요소:
+              
+              1. 인물 묘사 (필수): 
+                 - 프로필 특성에 기술된 모든 외모 특징을 포함해야 합니다.
+                 - 성별, 나이, 인종, 얼굴형, 피부색, 머리 스타일, 눈, 코, 입 등 자세한 외모 특징
+              
+              2. 시간 및 장소 (필수):
+                 - 일기 태그와 내용에서 언급된 시간 (예: 아침, 오후, 저녁, 밤)을 반영
+                 - 일기 태그와 내용에서 언급된 장소 (예: 공원, 카페, 사무실)를 반영
+              
+              3. 행동/활동 (필수):
+                 - 일기 태그와 내용에서 언급된 활동이나 행동 (예: 산책, 식사, 독서)을 반영
+                 - 인물이 수행하는 자연스러운 행동으로 묘사
+              
+              4. 분위기/감정 (필수):
+                 - 일기의 mood와 내용에서 느껴지는 감정 상태를 반영
+              
+              5. 배경 및 환경 (필수):
+                 - 시간과 장소에 어울리는 자연스러운 배경 묘사
+                 - 날씨, 조명 등의 환경 요소 포함
+              
+              6. 스타일 지정 (필수):
+                 - 사실적인 사진 스타일, 고품질, 자연스러운 구도
+                 - "realistic photo, high quality, natural composition, good lighting" 등의 스타일 지정자 포함
+              
+              중요 제약조건:
+              - 일기 내용을 고려하여 한 장면만 묘사해야 합니다 (여러 장면이나 시퀀스가 아닌).
+              - 가장 중요하고 시각적으로 구현 가능한 장면을 선택하세요.
+              - 인물의 모든 외모 특징을 포함하되, 일관성 있게 묘사하세요.
+              - 프롬프트는 쉼표로 구분된 키워드 형식보다는 자연스러운 영어 문장으로 작성해주세요.
+              - 항상 사실적인 사진 스타일로 마무리하세요.
+              
+              출력 형식:
+              - 스테이블 디퓨전에 바로 입력할 수 있는 서술형 영어 프롬프트로 작성
+              - 영어로 작성하며, 200-300자 내외로 작성
+              - 한국어를 포함하지 않음`
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "input_text",
+              "text": `프로필 특성: ${profileFeatures}
+              
+              일기 제목: ${diaryTitle}
+              
+              일기 내용: ${diaryContent}
+              
+              일기 태그: ${diaryTags.join(', ')}
+              
+              무드: ${diaryMood}`
+            }
+          ]
+        }
+      ],
+      text:{
+        "format":{
+            "type": "text"
+        }
+      },
+      reasoning: {
+        "effort": "high"
+      },
+      tools: [],
+      store: true
+    });
+
+    // 응답에서 생성된 텍스트 추출
+    const imagePrompt = response.output_text;
+    return imagePrompt;
+  } catch (error) {
+    console.error('이미지 프롬프트 생성 오류:', error);
+    return '이미지 프롬프트 생성에 실패했습니다.';
+  }
+};
+
+module.exports = { analyzeImageFeatures, analyzeDiaryContent, generateImagePrompt }; 

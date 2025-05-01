@@ -47,6 +47,10 @@
     button:hover {
       background-color: #45a049;
     }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
     .result {
       margin-top: 15px;
       padding: 10px;
@@ -117,7 +121,7 @@
           <label for="registerProfilePhoto">프로필 사진:</label>
           <input type="file" id="registerProfilePhoto" accept="image/*">
         </div>
-        <button onclick="registerUser()">회원가입</button>
+        <button id="registerButton" onclick="registerUser()">회원가입</button>
         <div id="registerResult" class="result"></div>
       </div>
       
@@ -131,13 +135,13 @@
           <label for="loginPassword">비밀번호:</label>
           <input type="password" id="loginPassword" placeholder="비밀번호">
         </div>
-        <button onclick="loginUser()">로그인</button>
+        <button id="loginButton" onclick="loginUser()">로그인</button>
         <div id="loginResult" class="result"></div>
       </div>
       
       <div class="section">
         <h2>프로필 조회 (GET /api/users/profile)</h2>
-        <button onclick="getUserProfile()">내 프로필 조회</button>
+        <button id="getProfileButton" onclick="getUserProfile()">내 프로필 조회</button>
         <div id="profileResult" class="result"></div>
       </div>
       
@@ -147,7 +151,7 @@
           <label for="updateProfilePhoto">새 프로필 사진:</label>
           <input type="file" id="updateProfilePhoto" accept="image/*">
         </div>
-        <button onclick="updateUserProfilePhoto()">프로필 사진 업데이트</button>
+        <button id="updateProfileButton" onclick="updateUserProfilePhoto()">프로필 사진 업데이트</button>
         <div id="updateProfileResult" class="result"></div>
       </div>
     </div>
@@ -175,13 +179,13 @@
           <label for="diaryPhotos">사진 (최대 5개):</label>
           <input type="file" id="diaryPhotos" accept="image/*" multiple>
         </div>
-        <button onclick="createDiary()">일기 작성</button>
+        <button id="createDiaryButton" onclick="createDiary()">일기 작성</button>
         <div id="createDiaryResult" class="result"></div>
       </div>
       
       <div class="section">
         <h2>내 일기 목록 조회 (GET /api/diaries)</h2>
-        <button onclick="getMyDiaries()">내 일기 목록 조회</button>
+        <button id="getMyDiariesButton" onclick="getMyDiaries()">내 일기 목록 조회</button>
         <div id="myDiariesResult" class="result"></div>
       </div>
       
@@ -191,7 +195,7 @@
           <label for="diarySearchKeyword">검색어:</label>
           <input type="text" id="diarySearchKeyword" placeholder="검색어">
         </div>
-        <button onclick="searchDiaries()">일기 검색</button>
+        <button id="searchDiaryButton" onclick="searchDiaries()">일기 검색</button>
         <div id="searchDiariesResult" class="result"></div>
       </div>
       
@@ -201,7 +205,7 @@
           <label for="diaryId">일기 ID:</label>
           <input type="text" id="diaryId" placeholder="일기 ID">
         </div>
-        <button onclick="getDiaryById()">일기 조회</button>
+        <button id="getDiaryButton" onclick="getDiaryById()">일기 조회</button>
         <div id="getDiaryResult" class="result"></div>
         
         <div style="margin-top: 20px;">
@@ -225,13 +229,20 @@
             <label for="updateDiaryPhotos">추가 사진:</label>
             <input type="file" id="updateDiaryPhotos" accept="image/*" multiple>
           </div>
-          <button onclick="updateDiary()">일기 수정</button>
+          <button id="updateDiaryButton" onclick="updateDiary()">일기 수정</button>
           <div id="updateDiaryResult" class="result"></div>
         </div>
         
         <div style="margin-top: 20px;">
-          <button onclick="deleteDiary()">일기 삭제</button>
+          <button id="deleteDiaryButton" onclick="deleteDiary()">일기 삭제</button>
           <div id="deleteDiaryResult" class="result"></div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+          <h3>이미지 생성 프롬프트 만들기 (GET /api/diaries/:id/prompt)</h3>
+          <p>선택한 일기 내용과 사용자 프로필 사진의 특징을 바탕으로 이미지 생성을 위한 프롬프트를 생성합니다.</p>
+          <button id="generatePromptButton" onclick="generateDiaryImagePrompt()">이미지 프롬프트 생성</button>
+          <div id="generatePromptResult" class="result"></div>
         </div>
       </div>
     </div>
@@ -261,13 +272,13 @@
           <label for="personPhoto">사진:</label>
           <input type="file" id="personPhoto" accept="image/*">
         </div>
-        <button onclick="addPerson()">사람 추가</button>
+        <button id="addPersonButton" onclick="addPerson()">사람 추가</button>
         <div id="addPersonResult" class="result"></div>
       </div>
       
       <div class="section">
         <h2>내가 추가한 사람 목록 조회 (GET /api/people)</h2>
-        <button onclick="getMyPeople()">사람 목록 조회</button>
+        <button id="getMyPeopleButton" onclick="getMyPeople()">사람 목록 조회</button>
         <div id="myPeopleResult" class="result"></div>
       </div>
       
@@ -277,7 +288,7 @@
           <label for="personSearchKeyword">검색어:</label>
           <input type="text" id="personSearchKeyword" placeholder="검색어">
         </div>
-        <button onclick="searchPeople()">사람 검색</button>
+        <button id="searchPeopleButton" onclick="searchPeople()">사람 검색</button>
         <div id="searchPeopleResult" class="result"></div>
       </div>
       
@@ -287,7 +298,7 @@
           <label for="personId">사람 ID:</label>
           <input type="text" id="personId" placeholder="사람 ID">
         </div>
-        <button onclick="getPersonById()">사람 조회</button>
+        <button id="getPersonButton" onclick="getPersonById()">사람 조회</button>
         <div id="getPersonResult" class="result"></div>
         
         <div style="margin-top: 20px;">
@@ -313,12 +324,12 @@
             <label for="updatePersonPhoto">새 사진:</label>
             <input type="file" id="updatePersonPhoto" accept="image/*">
           </div>
-          <button onclick="updatePerson()">사람 정보 수정</button>
+          <button id="updatePersonButton" onclick="updatePerson()">사람 정보 수정</button>
           <div id="updatePersonResult" class="result"></div>
         </div>
         
         <div style="margin-top: 20px;">
-          <button onclick="deletePerson()">사람 삭제</button>
+          <button id="deletePersonButton" onclick="deletePerson()">사람 삭제</button>
           <div id="deletePersonResult" class="result"></div>
         </div>
       </div>
@@ -346,9 +357,26 @@
       evt.currentTarget.className += " active";
     }
     
+    // 버튼 로딩 상태 관리 함수
+    function setButtonLoading(buttonId, isLoading, originalText = null) {
+      const button = document.getElementById(buttonId);
+      if (!button) return;
+      
+      if (isLoading) {
+        button.disabled = true;
+        button.originalText = button.textContent;
+        button.textContent = "작동중...";
+      } else {
+        button.disabled = false;
+        button.textContent = originalText || button.originalText || buttonId.replace('Button', '');
+      }
+    }
+    
     // 사용자 관리 함수들
     async function registerUser() {
       try {
+        setButtonLoading('registerButton', true);
+        
         const username = document.getElementById('registerUsername').value;
         const email = document.getElementById('registerEmail').value;
         const password = document.getElementById('registerPassword').value;
@@ -377,11 +405,15 @@
         }
       } catch (err) {
         document.getElementById('registerResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('registerButton', false);
       }
     }
     
     async function loginUser() {
       try {
+        setButtonLoading('loginButton', true);
+        
         const email = document.getElementById('loginEmail').value;
         const password = document.getElementById('loginPassword').value;
         
@@ -401,11 +433,15 @@
         }
       } catch (err) {
         document.getElementById('loginResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('loginButton', false);
       }
     }
     
     async function getUserProfile() {
       try {
+        setButtonLoading('getProfileButton', true);
+        
         if (!authToken) {
           document.getElementById('profileResult').textContent = '로그인이 필요합니다.';
           return;
@@ -419,11 +455,15 @@
         document.getElementById('profileResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('profileResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('getProfileButton', false);
       }
     }
     
     async function updateUserProfilePhoto() {
       try {
+        setButtonLoading('updateProfileButton', true);
+        
         if (!authToken) {
           document.getElementById('updateProfileResult').textContent = '로그인이 필요합니다.';
           return;
@@ -448,12 +488,16 @@
         document.getElementById('updateProfileResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('updateProfileResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('updateProfileButton', false);
       }
     }
     
     // 일기 관리 함수들
     async function createDiary() {
       try {
+        setButtonLoading('createDiaryButton', true);
+        
         if (!authToken) {
           document.getElementById('createDiaryResult').textContent = '로그인이 필요합니다.';
           return;
@@ -485,11 +529,15 @@
         document.getElementById('createDiaryResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('createDiaryResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('createDiaryButton', false);
       }
     }
     
     async function getMyDiaries() {
       try {
+        setButtonLoading('getMyDiariesButton', true);
+        
         if (!authToken) {
           document.getElementById('myDiariesResult').textContent = '로그인이 필요합니다.';
           return;
@@ -503,11 +551,15 @@
         document.getElementById('myDiariesResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('myDiariesResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('getMyDiariesButton', false);
       }
     }
     
     async function searchDiaries() {
       try {
+        setButtonLoading('searchDiaryButton', true);
+        
         if (!authToken) {
           document.getElementById('searchDiariesResult').textContent = '로그인이 필요합니다.';
           return;
@@ -523,11 +575,15 @@
         document.getElementById('searchDiariesResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('searchDiariesResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('searchDiaryButton', false);
       }
     }
     
     async function getDiaryById() {
       try {
+        setButtonLoading('getDiaryButton', true);
+        
         if (!authToken) {
           document.getElementById('getDiaryResult').textContent = '로그인이 필요합니다.';
           return;
@@ -547,11 +603,15 @@
         document.getElementById('getDiaryResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('getDiaryResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('getDiaryButton', false);
       }
     }
     
     async function updateDiary() {
       try {
+        setButtonLoading('updateDiaryButton', true);
+        
         if (!authToken) {
           document.getElementById('updateDiaryResult').textContent = '로그인이 필요합니다.';
           return;
@@ -589,11 +649,15 @@
         document.getElementById('updateDiaryResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('updateDiaryResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('updateDiaryButton', false);
       }
     }
     
     async function deleteDiary() {
       try {
+        setButtonLoading('deleteDiaryButton', true);
+        
         if (!authToken) {
           document.getElementById('deleteDiaryResult').textContent = '로그인이 필요합니다.';
           return;
@@ -614,12 +678,45 @@
         document.getElementById('deleteDiaryResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('deleteDiaryResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('deleteDiaryButton', false);
+      }
+    }
+    
+    // 이미지 생성 프롬프트 생성 함수
+    async function generateDiaryImagePrompt() {
+      try {
+        setButtonLoading('generatePromptButton', true);
+        
+        if (!authToken) {
+          document.getElementById('generatePromptResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        const id = document.getElementById('diaryId').value;
+        if (!id) {
+          document.getElementById('generatePromptResult').textContent = '일기 ID를 입력해주세요.';
+          return;
+        }
+        
+        const response = await fetch(`${API_URL}/diaries/${id}/prompt`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        document.getElementById('generatePromptResult').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('generatePromptResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('generatePromptButton', false);
       }
     }
     
     // 사람 관리 함수들
     async function addPerson() {
       try {
+        setButtonLoading('addPersonButton', true);
+        
         if (!authToken) {
           document.getElementById('addPersonResult').textContent = '로그인이 필요합니다.';
           return;
@@ -651,11 +748,15 @@
         document.getElementById('addPersonResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('addPersonResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('addPersonButton', false);
       }
     }
     
     async function getMyPeople() {
       try {
+        setButtonLoading('getMyPeopleButton', true);
+        
         if (!authToken) {
           document.getElementById('myPeopleResult').textContent = '로그인이 필요합니다.';
           return;
@@ -669,11 +770,15 @@
         document.getElementById('myPeopleResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('myPeopleResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('getMyPeopleButton', false);
       }
     }
     
     async function searchPeople() {
       try {
+        setButtonLoading('searchPeopleButton', true);
+        
         if (!authToken) {
           document.getElementById('searchPeopleResult').textContent = '로그인이 필요합니다.';
           return;
@@ -689,11 +794,15 @@
         document.getElementById('searchPeopleResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('searchPeopleResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('searchPeopleButton', false);
       }
     }
     
     async function getPersonById() {
       try {
+        setButtonLoading('getPersonButton', true);
+        
         if (!authToken) {
           document.getElementById('getPersonResult').textContent = '로그인이 필요합니다.';
           return;
@@ -713,11 +822,15 @@
         document.getElementById('getPersonResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('getPersonResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('getPersonButton', false);
       }
     }
     
     async function updatePerson() {
       try {
+        setButtonLoading('updatePersonButton', true);
+        
         if (!authToken) {
           document.getElementById('updatePersonResult').textContent = '로그인이 필요합니다.';
           return;
@@ -750,11 +863,15 @@
         document.getElementById('updatePersonResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('updatePersonResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('updatePersonButton', false);
       }
     }
     
     async function deletePerson() {
       try {
+        setButtonLoading('deletePersonButton', true);
+        
         if (!authToken) {
           document.getElementById('deletePersonResult').textContent = '로그인이 필요합니다.';
           return;
@@ -775,6 +892,8 @@
         document.getElementById('deletePersonResult').textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('deletePersonResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('deletePersonButton', false);
       }
     }
   </script>

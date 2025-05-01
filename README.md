@@ -8,6 +8,7 @@
 - [구현 기능](#구현-기능)
 - [API 명세](#api-명세)
 - [API 데이터 요약](#api-데이터-요약)
+- [AI 분석 예시](#ai-분석-예시)
 - [실행 방법](#실행-방법)
 </details>
 
@@ -85,6 +86,7 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버임. 사용자 �
 - 일기 수정 및 삭제 기능 제공함
 - 일기 검색 기능 제공함
 - 일기 내용 자동 분석 (태그, 무드 추출) 기능 제공함
+- 일기 내용을 기반으로 이미지 생성 프롬프트 자동 생성 기능 제공함
 
 ### 3. 사람 관리
 
@@ -92,6 +94,10 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버임. 사용자 �
 - 사람 정보 조회 (목록/개별) 기능 제공함
 - 사람 정보 수정 및 삭제 기능 제공함
 - 사람 검색 기능 제공함
+- OpenAI API를 활용한 이미지 특징 분석 기능 제공함
+- 일기 내용 자동 분석을 통한 태그 및 감정 추출 기능 제공함
+- 일기 내용을 분석하여 이미지 생성 프롬프트 제공 기능 추가함
+- 분석 결과를 기반으로 한 검색 기능 강화함
 
 ### 4. AI 기반 분석
 
@@ -114,24 +120,25 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버임. 사용자 �
 <details>
 <summary>📋 API 명세</summary>
 
-| 메소드 | 엔드포인트                     | 설명                 | 인증 필요 | 요청 본문                                      | 응답                                       |
-|--------|--------------------------------|----------------------|-----------|-----------------------------------------------|-------------------------------------------|
-| POST   | /api/users/register            | 회원가입             | 아니오    | username, email, password, profilePhoto(파일) | 사용자 정보, JWT 토큰                     |
-| POST   | /api/users/login               | 로그인               | 아니오    | email, password                               | 사용자 정보, JWT 토큰                     |
-| GET    | /api/users/profile             | 프로필 조회          | 예        | -                                             | 사용자 정보                               |
-| PUT    | /api/users/profile/photo       | 프로필 사진 업데이트 | 예        | profilePhoto(파일)                           | 업데이트된 사용자 정보                    |
-| POST   | /api/diaries                   | 일기 작성            | 예        | title, content, mood(선택), tags(선택), photos(선택)     | 생성된 일기 정보 (AI 분석 태그/무드 포함)   |
-| GET    | /api/diaries                   | 내 일기 전체 조회    | 예        | -                                             | 일기 목록                                 |
-| GET    | /api/diaries/search?keyword=값 | 일기 검색            | 예        | query: keyword                               | 검색 결과 일기 목록                       |
-| GET    | /api/diaries/:id               | 특정 일기 조회       | 예        | -                                             | 일기 상세 정보                            |
-| PUT    | /api/diaries/:id               | 일기 수정            | 예        | title(선택), content(선택), mood(선택), tags(선택), photos(선택) | 업데이트된 일기 정보 (AI 분석 태그/무드 포함) |
-| DELETE | /api/diaries/:id               | 일기 삭제            | 예        | -                                             | 성공 메시지                               |
-| POST   | /api/people                    | 사람 추가            | 예        | name, relation, notes, photo(파일)           | 생성된 사람 정보                          |
-| GET    | /api/people                    | 내가 추가한 사람 목록 | 예        | -                                             | 사람 목록                                 |
-| GET    | /api/people/search?keyword=값  | 사람 검색            | 예        | query: keyword                               | 검색 결과 사람 목록                       |
-| GET    | /api/people/:id                | 특정 사람 조회       | 예        | -                                             | 사람 상세 정보                            |
-| PUT    | /api/people/:id                | 사람 정보 수정       | 예        | name, relation, notes, photo(파일)           | 업데이트된 사람 정보                      |
-| DELETE | /api/people/:id                | 사람 삭제            | 예        | -                                             | 성공 메시지                               |
+| 메소드 | 엔드포인트                     | 설명                             | 인증 필요 | 요청 본문                                      | 응답                                       |
+|--------|--------------------------------|----------------------------------|-----------|-----------------------------------------------|-------------------------------------------|
+| POST   | /api/users/register            | 회원가입                         | 아니오    | username, email, password, profilePhoto(파일) | 사용자 정보, JWT 토큰                     |
+| POST   | /api/users/login               | 로그인                           | 아니오    | email, password                               | 사용자 정보, JWT 토큰                     |
+| GET    | /api/users/profile             | 프로필 조회                      | 예        | -                                             | 사용자 정보                               |
+| PUT    | /api/users/profile/photo       | 프로필 사진 업데이트             | 예        | profilePhoto(파일)                           | 업데이트된 사용자 정보                    |
+| POST   | /api/diaries                   | 일기 작성                        | 예        | title, content, mood(선택), tags(선택), photos(선택)     | 생성된 일기 정보 (AI 분석 태그/무드 포함)   |
+| GET    | /api/diaries                   | 내 일기 전체 조회                | 예        | -                                             | 일기 목록                                 |
+| GET    | /api/diaries/search?keyword=값 | 일기 검색                        | 예        | query: keyword                               | 검색 결과 일기 목록                       |
+| GET    | /api/diaries/:id               | 특정 일기 조회                   | 예        | -                                             | 일기 상세 정보                            |
+| GET    | /api/diaries/:id/prompt        | 일기 기반 이미지 생성 프롬프트  | 예        | -                                             | 생성된 프롬프트 텍스트                    |
+| PUT    | /api/diaries/:id               | 일기 수정                        | 예        | title(선택), content(선택), mood(선택), tags(선택), photos(선택) | 업데이트된 일기 정보 (AI 분석 태그/무드 포함) |
+| DELETE | /api/diaries/:id               | 일기 삭제                        | 예        | -                                             | 성공 메시지                               |
+| POST   | /api/people                    | 사람 추가                        | 예        | name, relation, notes, photo(파일)           | 생성된 사람 정보                          |
+| GET    | /api/people                    | 내가 추가한 사람 목록             | 예        | -                                             | 사람 목록                                 |
+| GET    | /api/people/search?keyword=값  | 사람 검색                        | 예        | query: keyword                               | 검색 결과 사람 목록                       |
+| GET    | /api/people/:id                | 특정 사람 조회                   | 예        | -                                             | 사람 상세 정보                            |
+| PUT    | /api/people/:id                | 사람 정보 수정                   | 예        | name, relation, notes, photo(파일)           | 업데이트된 사람 정보                      |
+| DELETE | /api/people/:id                | 사람 삭제                        | 예        | -                                             | 성공 메시지                               |
 </details>
 
 ## API 데이터 요약
@@ -171,6 +178,7 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버임. 사용자 �
 | GET /api/diaries/:id | Authorization 헤더(Bearer 토큰), id(경로 파라미터) | 일기 객체 |
 | PUT /api/diaries/:id | Authorization 헤더(Bearer 토큰), id(경로 파라미터), title(선택), content(선택), mood(선택), tags(선택), photos(선택) | 수정된 일기 객체 |
 | DELETE /api/diaries/:id | Authorization 헤더(Bearer 토큰), id(경로 파라미터) | 삭제 메시지 |
+| GET /api/diaries/:id/prompt | Authorization 헤더(Bearer 토큰), id(경로 파라미터) | { prompt: "생성된 프롬프트 문자열" } |
 </details>
 
 <details>
@@ -201,6 +209,49 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버임. 사용자 �
 - 일기 작성 시 제목과 내용만 입력하고 태그와 무드는 비워두면 자동으로 생성됨.
 - 태그 필드에 일부 태그만 입력하면, 자동 생성 태그가 추가로 병합됨.
 - 무드 필드를 비워두면 자동으로 감정 상태가 분석되어 설정됨.
+</details>
+
+## AI 분석 예시
+
+<details>
+<summary>🖼️ 인물 묘사 분석 예시</summary>
+
+AI는 업로드된 인물 사진을 분석하여 다음과 같이 주요 특징을 묘사합니다. 이 정보는 인물 검색 및 관리에 활용될 수 있습니다.
+
+**입력 이미지 예시:**
+
+![인물 사진 예시](pictures/프로필예_카리나.jpg)
+
+**분석 결과:**
+
+![인물 묘사 결과](pictures/인물묘사%20결과.png)
+
+</details>
+
+<details>
+<summary>📝 일기 내용 태깅 예시</summary>
+
+일기 작성 시 AI가 자동으로 내용을 분석하여 관련 태그와 감정(무드)을 추출합니다. 이를 통해 사용자는 과거의 기록을 더 쉽게 검색하고 분류할 수 있습니다.
+
+**입력 일기 예시:**
+
+![일기 작성 예시](pictures/일기%20작성%20예시.png)
+
+**자동 태깅 결과:**
+
+![일기 내용 태그 결과](pictures/일기%20내용%20태그%20결과.png)
+
+</details>
+
+<details>
+<summary>✨ 이미지 프롬프트 생성 예시</summary>
+
+특정 일기의 내용을 기반으로 AI가 이미지 생성을 위한 프롬프트를 자동으로 만들어줍니다. 이 프롬프트를 활용하여 사용자는 일기와 관련된 이미지를 생성할 수 있습니다.
+
+**프롬프트 생성 결과:**
+
+![이미지 프롬프트 생성 예시](pictures/이미지%20프롬프트%20생성.png)
+
 </details>
 
 <details>
