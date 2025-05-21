@@ -2,6 +2,7 @@ const Diary = require('../models/diaryModel');
 const User = require('../models/userModel');
 const { uploadToS3 } = require('../config/uploadConfig');
 const { analyzeDiaryContent, generateImagePrompt } = require('../config/openaiConfig');
+const { customizeWorkflow, runComfyWorkflow } = require('../config/comfyuiConfig');
 const fs = require('fs');
 const path = require('path');
 
@@ -252,6 +253,93 @@ const generateImagePromptFromDiary = async (req, res) => {
   }
 };
 
+// ComfyUI를 활용한 이미지 생성
+const generateDiaryImageWithComfy = async (req, res) => {
+  try {
+    const diaryId = req.params.id;
+    
+    // 일기 데이터 조회
+    const diary = await Diary.findById(diaryId);
+    if (!diary) {
+      return res.status(404).json({ message: '일기를 찾을 수 없습니다.' });
+    }
+    
+    // 권한 확인 (일기 작성자만 접근 가능)
+    if (diary.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: '권한이 없습니다.' });
+    }
+    
+    // 사용자 조회 및 프로필 이미지 경로 가져오기
+    const user = await User.findById(req.user._id);
+    if (!user || !user.profilePhoto) {
+      return res.status(400).json({ message: '프로필 사진이 필요합니다.' });
+    }
+    
+    const profilePhoto = user.profilePhoto;
+    const profilePhotoPath = path.join(__dirname, '..', '..', profilePhoto);
+    
+    // 프로필 사진 파일 존재 확인
+    if (!fs.existsSync(profilePhotoPath)) {
+      return res.status(400).json({ message: '프로필 사진 파일을 찾을 수 없습니다.' });
+    }
+    
+    // 일기 프롬프트 생성
+    const promptResult = await generateImagePrompt(
+      diary.title,
+      diary.content,
+      diary.tags,
+      diary.mood
+    );
+    
+    // ComfyUI 워크플로우 로드
+    const workflowPath = path.join(__dirname, '..', '..', 'comfytest.json');
+    if (!fs.existsSync(workflowPath)) {
+      return res.status(500).json({ message: 'ComfyUI 워크플로우 파일을 찾을 수 없습니다.' });
+    }
+    
+    const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+    
+    // 워크플로우 커스터마이징
+    const customizedWorkflow = customizeWorkflow(workflow, {
+      prompt: promptResult.prompt,
+      imagePath: profilePhotoPath
+    });
+    
+    // ComfyUI API 호출
+    const comfyResponse = await runComfyWorkflow(customizedWorkflow);
+    
+    if (!comfyResponse.success) {
+      return res.status(500).json({ 
+        message: '이미지 생성에 실패했습니다.', 
+        error: comfyResponse.error 
+      });
+    }
+    
+    // 생성된 이미지 저장
+    const uploadDir = path.join(__dirname, '..', '..', 'uploads');
+    const filename = `diary_${diaryId}_${Date.now()}.png`;
+    const imagePath = path.join(uploadDir, filename);
+    
+    fs.writeFileSync(imagePath, comfyResponse.imageData);
+    
+    // 일기에 생성된 이미지 추가
+    const photoUrl = `/uploads/${filename}`;
+    diary.photos.push(photoUrl);
+    await diary.save();
+    
+    // 응답
+    res.status(201).json({
+      message: '이미지가 성공적으로 생성되었습니다.',
+      photo: photoUrl,
+      diary
+    });
+    
+  } catch (error) {
+    console.error('이미지 생성 오류:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+};
+
 module.exports = {
   createDiary,
   getDiaries,
@@ -260,4 +348,5 @@ module.exports = {
   deleteDiary,
   searchDiaries,
   generateImagePromptFromDiary,
+  generateDiaryImageWithComfy,
 }; 

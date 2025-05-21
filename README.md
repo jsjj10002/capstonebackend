@@ -1,4 +1,4 @@
-*최종 업데이트: 2025-05-01*
+*최종 업데이트: 2025-05-21*
 
 <details>
 <summary>📌 목차</summary>
@@ -9,6 +9,7 @@
 - [API 명세](#api-명세)
 - [API 데이터 요약](#api-데이터-요약)
 - [AI 분석 예시](#ai-분석-예시)
+- [ComfyUI 연동 기능](#comfyui-연동-기능)
 - [실행 방법](#실행-방법)
 </details>
 
@@ -28,6 +29,7 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 - 이미지 업로드 기능 구현했다
 - 주변 사람들의 정보 및 사진 관리 기능 추가했다
 - 일기 내용 자동 분석으로 태그 및 무드 추출 기능 추가했다
+- ComfyUI 연동하여 일기 내용 기반 실제 이미지 생성 기능 추가했다
 
 ### 2. AWS 설정
 
@@ -43,6 +45,7 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 - AWS 액세스 키 및 설정했다
 - 포트 설정했다
 - OpenAI API 키 설정했다
+- ComfyUI 서버 URL 설정했다
 
 ### 4. 일기 내용 분석 프롬프트
 
@@ -63,6 +66,13 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 - 일기의 장면만 묘사하는 방식으로 프롬프트 생성
 - 일기의 시간, 장소, 분위기, 활동 등을 반영한 생생한 장면 묘사
 - 인물의 얼굴 특징은 포함하지 않고 장면 위주로 프롬프트 구성
+
+### 6. ComfyUI 연동
+
+- ComfyUI와의 API 통신 기능 구현
+- 워크플로우 JSON 커스터마이징 로직 개발
+- 사용자 프로필 사진 기반 이미지 생성 기능 추가
+- AI 생성 프롬프트와 ComfyUI 통합으로 완전 자동화된 이미지 생성 구현
 </details>
 
 <details>
@@ -82,6 +92,7 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 - 일기 검색 기능 제공한다
 - 일기 내용 자동 분석 (태그, 무드 추출) 기능 제공한다
 - 일기 내용을 기반으로 이미지 생성 프롬프트 자동 생성 기능 제공한다
+- 일기 내용 기반으로 ComfyUI를 통한 실제 이미지 생성 기능 제공한다
 
 ### 3. 사람 관리
 
@@ -95,6 +106,7 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 - 일기 내용 자동 분석을 통한 태그 및 감정 추출 기능 제공한다
 - 일기 내용을 기반으로 장면 중심 이미지 생성 프롬프트 제공 기능
 - 분석 결과를 기반으로 한 검색 기능 강화했다
+- 사용자 프로필 이미지와 일기 내용을 결합한 맞춤형 AI 이미지 생성 기능 제공한다
 
 ### 5. 파일 업로드
 
@@ -124,6 +136,7 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 | GET    | /api/diaries/filter            | 일기 필터링(태그/무드/날짜)      | 예        | tags(선택), mood(선택), startDate(선택), endDate(선택) | 필터링된 일기 목록                       |
 | GET    | /api/diaries/:id               | 특정 일기 조회                   | 예        | -                                             | 일기 상세 정보                            |
 | GET    | /api/diaries/:id/prompt        | 일기 기반 이미지 생성 프롬프트  | 예        | -                                             | 생성된 프롬프트 텍스트                    |
+| POST   | /api/diaries/:id/generate-image | 일기 내용과 프로필 사진 기반 이미지 생성 | 예 | - | 생성된 이미지 URL 및 일기 정보 |
 | PUT    | /api/diaries/:id               | 일기 수정                        | 예        | title(선택), content(선택), mood(선택), tags(선택), photos(선택) | 업데이트된 일기 정보 (AI 분석 태그/무드 포함) |
 | DELETE | /api/diaries/:id               | 일기 삭제                        | 예        | -                                             | 성공 메시지                               |
 | DELETE | /api/diaries/:id/photos/:photoId | 일기에서 특정 사진 삭제        | 예        | -                                             | 업데이트된 일기 정보                      |
@@ -179,6 +192,7 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 | DELETE /api/diaries/:id | Authorization 헤더(Bearer 토큰), id(경로 파라미터) | 삭제 메시지 |
 | DELETE /api/diaries/:id/photos/:photoId | Authorization 헤더(Bearer 토큰), id(경로 파라미터), photoId(경로 파라미터) | 수정된 일기 객체 |
 | GET /api/diaries/:id/prompt | Authorization 헤더(Bearer 토큰), id(경로 파라미터) | { prompt: "생성된 프롬프트 문자열" } |
+| POST /api/diaries/:id/generate-image | Authorization 헤더(Bearer 토큰), id(경로 파라미터) | { message: "이미지가 성공적으로 생성되었습니다.", photo: 이미지URL, diary: 일기객체 } |
 | GET /api/tags | Authorization 헤더(Bearer 토큰) | 문자열 태그 배열 |
 </details>
 
@@ -245,6 +259,68 @@ Express.js 기반 일기 애플리케이션의 백엔드 서버이다. 사용자
 
 </details>
 
+## ComfyUI 연동 기능
+
+<details>
+<summary>📋 ComfyUI 이미지 생성 기능</summary>
+
+### 기능 개요
+
+일기 내용 기반으로 생성된 프롬프트와 사용자 프로필 사진을 활용하여 ComfyUI를 통해 맞춤형 이미지를 생성하는 기능을 제공한다.
+
+### 동작 방식
+
+1. **워크플로우 기반 이미지 생성**
+   - 사전 정의된 워크플로우 템플릿(comfytest.json)을 사용한다.
+   - 워크플로우에는 컨트롤넷(OpenPose)을 통한 인물 포즈 반영이 포함된다.
+   - 프로필 사진의 포즈를 기반으로 일기 내용에 맞는 장면을 생성한다.
+   
+2. **자동 프롬프트 활용**
+   - 일기 내용 분석을 통해 자동 생성된 프롬프트를 이미지 생성에 활용한다.
+   - 장면, 분위기, 시간대 등 일기의 핵심 요소가 반영된 이미지를 생성한다.
+
+3. **사용자 프로필 사진 활용**
+   - 사용자의 프로필 사진에서 포즈 정보를 추출하여 이미지 생성에 반영한다.
+   - 얼굴 특징은 제외하고 자세와 구도만 참조한다.
+
+4. **생성된 이미지 저장 및 연결**
+   - 생성된 이미지는 자동으로 일기에 첨부된다.
+   - 동일한 일기에 여러 이미지를 생성하여 첨부할 수 있다.
+
+### 사용 방법
+
+1. 로그인하여 프로필 사진이 등록된 상태여야 한다.
+2. 일기를 작성하거나 기존 일기를 선택한다.
+3. 해당 일기 ID를 사용하여 이미지 생성 API를 호출한다.
+4. 생성된 이미지는 자동으로 해당 일기에 추가된다.
+
+### 예시 API 호출
+
+```
+POST /api/diaries/:id/generate-image
+Authorization: Bearer [토큰]
+```
+
+### API 응답 예시
+
+```json
+{
+  "message": "이미지가 성공적으로 생성되었습니다.",
+  "photo": "/uploads/diary_60a1c2b3c4d5e6f7g8h9i0_1234567890.png",
+  "diary": {
+    "_id": "60a1c2b3c4d5e6f7g8h9i0",
+    "title": "공원 산책",
+    "content": "오늘 저녁에...",
+    "photos": [
+      "/uploads/diary_60a1c2b3c4d5e6f7g8h9i0_1234567890.png"
+    ],
+    "..."
+  }
+}
+```
+
+</details>
+
 <details>
 <summary>📋 실행 방법</summary>
 
@@ -261,7 +337,17 @@ AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 AWS_REGION=your_aws_region
 AWS_S3_BUCKET=your_s3_bucket_name
 OPENAI_API_KEY=your_openai_api_key
+COMFY_SERVER_URL=http://127.0.0.1:8000
 ```
+
+### ComfyUI 설정
+
+1. ComfyUI가 설치되어 있어야 한다.
+2. ComfyUI 서버가 실행 중이어야 한다 (기본 포트: 8000).
+3. 필요한 모델이 ComfyUI에 설치되어 있어야 한다:
+   - SD XL Turbo 모델
+   - ControlNet OpenPose 모델
+   - VAE 모델
 
 ### 개발 서버 실행
 

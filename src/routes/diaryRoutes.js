@@ -8,6 +8,7 @@ const {
   deleteDiary,
   searchDiaries,
   generateImagePromptFromDiary,
+  generateDiaryImageWithComfy,
 } = require('../controllers/diaryController');
 const { protect } = require('../middleware/authMiddleware');
 const { uploadLocal } = require('../config/uploadConfig');
@@ -29,6 +30,9 @@ router.get('/:id', getDiaryById);
 
 // 특정 일기의 이미지 생성 프롬프트 생성 라우트
 router.get('/:id/prompt', generateImagePromptFromDiary);
+
+// ComfyUI를 사용하여 일기 이미지 생성 라우트
+router.post('/:id/generate-image', generateDiaryImageWithComfy);
 
 // 일기 수정 라우트
 router.put('/:id', uploadLocal.array('photos', 5), updateDiary);
