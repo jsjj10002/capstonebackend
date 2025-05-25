@@ -16,11 +16,13 @@
     "jsonwebtoken": "^9.0.1",
     "mongoose": "^7.5.0",
     "multer": "^1.4.5-lts.1",
+    "node-fetch": "^2.7.0",
     "openai": "^4.96.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "ws": "^8.18.2"
   },
   "scripts": {
     "start": "react-scripts start",

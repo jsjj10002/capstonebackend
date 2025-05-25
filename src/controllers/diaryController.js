@@ -5,6 +5,7 @@ const { analyzeDiaryContent, generateImagePrompt } = require('../config/openaiCo
 const { customizeWorkflow, runComfyWorkflow } = require('../config/comfyuiConfig');
 const fs = require('fs');
 const path = require('path');
+const fetch = require('node-fetch');
 
 // 새 일기 작성
 const createDiary = async (req, res) => {
@@ -246,6 +247,13 @@ const generateImagePromptFromDiary = async (req, res) => {
       diary.mood
     );
     
+    // 세션에 프롬프트 저장 (Redis 등을 사용하는 것이 더 좋습니다만, 예시로 세션 사용)
+    req.session = req.session || {};
+    req.session[`prompt_${diaryId}`] = prompt;
+    
+    console.log(`프롬프트 생성 및 저장 완료. 일기 ID: ${diaryId}, 길이: ${prompt.length}자`);
+    console.log(`프롬프트 내용 미리보기: ${prompt.substring(0, 100)}...`);
+    
     res.json({ prompt });
   } catch (error) {
     console.error('이미지 프롬프트 생성 오류:', error);
@@ -283,30 +291,104 @@ const generateDiaryImageWithComfy = async (req, res) => {
       return res.status(400).json({ message: '프로필 사진 파일을 찾을 수 없습니다.' });
     }
     
-    // 일기 프롬프트 생성
-    const promptResult = await generateImagePrompt(
-      diary.title,
-      diary.content,
-      diary.tags,
-      diary.mood
-    );
+    // 이전에 생성된 프롬프트 가져오기
+    let prompt;
+    
+    // 클라이언트에서 프롬프트를 바로 전달받은 경우
+    if (req.body && req.body.prompt) {
+      prompt = req.body.prompt;
+      console.log('클라이언트에서 직접 전달받은 프롬프트 사용');
+    } 
+    // 세션에 저장된 프롬프트 확인
+    else if (req.session && req.session[`prompt_${diaryId}`]) {
+      prompt = req.session[`prompt_${diaryId}`];
+      console.log('세션에 저장된 프롬프트 사용');
+    } 
+    // 프롬프트가 없는 경우 새로 생성
+    else {
+      console.log('저장된 프롬프트 없음, 새로 생성합니다');
+      prompt = await generateImagePrompt(
+        diary.title,
+        diary.content,
+        diary.tags,
+        diary.mood
+      );
+    }
+    
+    // 프롬프트 유효성 확인
+    if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
+      console.error('유효하지 않은 프롬프트:', prompt);
+      return res.status(500).json({ message: '이미지 프롬프트 생성에 실패했습니다' });
+    }
+    
+    console.log('최종 사용 프롬프트:', prompt.substring(0, 100) + '...');
     
     // ComfyUI 워크플로우 로드
     const workflowPath = path.join(__dirname, '..', '..', 'comfytest.json');
     if (!fs.existsSync(workflowPath)) {
+      console.error('ComfyUI 워크플로우 파일을 찾을 수 없음:', workflowPath);
       return res.status(500).json({ message: 'ComfyUI 워크플로우 파일을 찾을 수 없습니다.' });
     }
     
+    console.log(`ComfyUI 워크플로우 파일 로드: ${workflowPath}`);
     const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
     
+    // 워크플로우 상태 확인
+    console.log('워크플로우 노드 ID 확인:');
+    console.log('노드 46 (LoadImage) 존재 여부:', !!workflow['46']);
+    console.log('노드 54 (CLIPTextEncode) 존재 여부:', !!workflow['54']);
+    console.log('노드 56 (CLIPTextEncode) 존재 여부:', !!workflow['56']);
+    console.log('노드 51 (SaveImage) 존재 여부:', !!workflow['51']);
+    
     // 워크플로우 커스터마이징
+    console.log(`워크플로우 커스터마이징: 
+      - 프롬프트 길이: ${prompt.length} 자
+      - 이미지 경로: ${profilePhotoPath}
+      - 이미지 존재 여부: ${fs.existsSync(profilePhotoPath) ? '예' : '아니오'}`);
+      
     const customizedWorkflow = customizeWorkflow(workflow, {
-      prompt: promptResult.prompt,
+      prompt: prompt,
       imagePath: profilePhotoPath
     });
     
+    // 프롬프트가 노드에 제대로 설정되었는지 확인
+    if (customizedWorkflow['54']) {
+      console.log('노드 54 프롬프트 설정값:', customizedWorkflow['54'].inputs.text.substring(0, 50) + '...');
+    }
+    if (customizedWorkflow['56']) {
+      console.log('노드 56 프롬프트 설정값:', customizedWorkflow['56'].inputs.text.substring(0, 50) + '...');
+    }
+    
+    // SaveImage 노드 설정 확인
+    if (customizedWorkflow['51']) {
+      console.log('노드 51 (SaveImage) 설정:', JSON.stringify(customizedWorkflow['51'].inputs));
+    }
+    
+    // ComfyUI 서버 상태 확인
+    const COMFY_SERVER = req.app.locals.COMFY_SERVER_URL || 'http://127.0.0.1:8188';
+    try {
+      console.log(`ComfyUI 서버 연결 확인 시도: ${COMFY_SERVER}/system_stats`);
+      const serverCheckResponse = await fetch(`${COMFY_SERVER}/system_stats`);
+      if (serverCheckResponse.ok) {
+        const stats = await serverCheckResponse.json();
+        console.log('ComfyUI 서버 연결 확인 완료:', JSON.stringify(stats).substring(0, 100) + '...');
+      } else {
+        console.warn(`ComfyUI 서버 응답은 받았으나 상태가 좋지 않음: ${serverCheckResponse.status}`);
+      }
+    } catch (err) {
+      console.error('ComfyUI 서버 연결 확인 실패:', err);
+      return res.status(500).json({ 
+        message: 'ComfyUI 서버에 연결할 수 없습니다', 
+        error: err.message || '알 수 없는 연결 오류'
+      });
+    }
+    
     // ComfyUI API 호출
+    console.log('ComfyUI API 호출 시작...');
+    const startTime = Date.now();
     const comfyResponse = await runComfyWorkflow(customizedWorkflow);
+    console.log(`ComfyUI API 호출 완료: ${(Date.now() - startTime) / 1000}초 소요`);
+    console.log('ComfyUI 응답 상태:', comfyResponse.success ? '성공' : '실패');
     
     if (!comfyResponse.success) {
       return res.status(500).json({ 

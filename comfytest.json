@@ -108,7 +108,7 @@
   },
   "47": {
     "inputs": {
-      "ckpt_name": "sd_xl_turbo_1.0_fp16.safetensors"
+      "ckpt_name": "v1-5-pruned-emaonly-fp16.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
@@ -175,9 +175,9 @@
   },
   "51": {
     "inputs": {
-      "filename_prefix": "ComfyUI",
+      "filename_prefix": "ComfyUI_output",
       "images": [
-        "52",
+        "49",
         0
       ]
     },
@@ -189,7 +189,7 @@
   "52": {
     "inputs": {
       "samples": [
-        "58",
+        "50",
         0
       ],
       "vae": [
@@ -204,7 +204,7 @@
   },
   "53": {
     "inputs": {
-      "ckpt_name": "japaneseStyleRealistic_v20.safetensors"
+      "ckpt_name": "v1-5-pruned-emaonly-fp16.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
@@ -213,7 +213,7 @@
   },
   "54": {
     "inputs": {
-      "text": "A solitary figure walks away from the viewer along a tree-lined path in a city park at sunset on a clear spring evening. Golden light filters through fresh green leaves, creating dappled shadows on the paved walkway and on empty wooden benches. The scene exudes a calm, peaceful atmosphere as the person enjoys a quiet evening stroll. The image is captured in a realistic photo style with high quality, natural composition, and soft, beautiful lighting.",
+      "text": "A solitary figure walks away from the viewer along a tree-lined path in a city park at sunset on a clear spring evening. Golden light filters through fresh green leaves, creating dappled shadows on the paved walkway and on empty wooden benches.",
       "clip": [
         "38",
         0
@@ -226,7 +226,7 @@
   },
   "55": {
     "inputs": {
-      "text": "(hands), text, error, cropped, (worst quality:1.2), (low quality:1.2), normal quality, (jpeg artifacts:1.3), signature, watermark, username, blurry, artist name, monochrome, sketch, censorship, censor, (copyright:1.2), extra legs, (forehead mark) (depth of field) (emotionless) (penis) (pumpkin)",
+      "text": "(hands), text, error, cropped, (worst quality:1.2), (low quality:1.2), normal quality, (jpeg artifacts:1.3), signature, watermark, username, blurry, artist name",
       "clip": [
         "38",
         0
@@ -239,7 +239,7 @@
   },
   "56": {
     "inputs": {
-      "text": "A solitary figure walks away from the viewer along a tree-lined path in a city park at sunset on a clear spring evening. Golden light filters through fresh green leaves, creating dappled shadows on the paved walkway and on empty wooden benches. The scene exudes a calm, peaceful atmosphere as the person enjoys a quiet evening stroll. The image is captured in a realistic photo style with high quality, natural composition, and soft, beautiful lighting.",
+      "text": "A solitary figure walks away from the viewer along a tree-lined path in a city park at sunset on a clear spring evening. Golden light filters through fresh green leaves, creating dappled shadows on the paved walkway and on empty wooden benches.",
       "clip": [
         "37",
         0
@@ -252,7 +252,7 @@
   },
   "57": {
     "inputs": {
-      "text": "(hands), text, error, cropped, (worst quality:1.2), (low quality:1.2), normal quality, (jpeg artifacts:1.3), signature, watermark, username, blurry, artist name, monochrome, sketch, censorship, censor, (copyright:1.2), extra legs, (forehead mark) (depth of field) (emotionless) (penis) (pumpkin)",
+      "text": "(hands), text, error, cropped, (worst quality:1.2), (low quality:1.2), normal quality, (jpeg artifacts:1.3), signature, watermark, username, blurry, artist name",
       "clip": [
         "37",
         0

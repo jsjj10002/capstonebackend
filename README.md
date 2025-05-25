@@ -337,7 +337,7 @@ AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 AWS_REGION=your_aws_region
 AWS_S3_BUCKET=your_s3_bucket_name
 OPENAI_API_KEY=your_openai_api_key
-COMFY_SERVER_URL=http://127.0.0.1:8000
+COMFY_SERVER_URL=http://127.0.0.1:8188
 ```
 
 ### ComfyUI 설정

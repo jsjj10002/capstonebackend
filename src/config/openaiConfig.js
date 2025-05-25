@@ -176,10 +176,17 @@ const generateImagePrompt = async (diaryTitle, diaryContent, diaryTags, diaryMoo
 
     // 응답에서 생성된 텍스트 추출
     const imagePrompt = response.output_text;
+    console.log('OpenAI로부터 생성된 원본 프롬프트:', imagePrompt.substring(0, 100) + '...');
+    
+    if (!imagePrompt || imagePrompt.trim() === '') {
+      throw new Error('OpenAI가 빈 프롬프트를 반환했습니다');
+    }
+    
     return imagePrompt;
   } catch (error) {
     console.error('이미지 프롬프트 생성 오류:', error);
-    return '이미지 프롬프트 생성에 실패했습니다.';
+    // 기본 프롬프트 반환
+    return 'A beautiful landscape with natural lighting, realistic photo, high quality.';
   }
 };
 

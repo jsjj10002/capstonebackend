@@ -244,6 +244,21 @@
           <button id="generatePromptButton" onclick="generateDiaryImagePrompt()">이미지 프롬프트 생성</button>
           <div id="generatePromptResult" class="result"></div>
         </div>
+        
+        <div style="margin-top: 20px;">
+          <h3>ComfyUI로 이미지 생성하기 (POST /api/diaries/:id/generate-image)</h3>
+          <p>선택한 일기의 내용을 기반으로 생성된 프롬프트와 사용자 프로필 사진을 활용하여 ComfyUI를 통해 이미지를 생성합니다.</p>
+          <button id="generateImageButton" onclick="generateDiaryImage()">ComfyUI 이미지 생성</button>
+          <div id="generateImageResult" class="result"></div>
+          <div id="generatedImageContainer" style="margin-top: 15px;"></div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+          <h3>ComfyUI 서버 상태 확인</h3>
+          <p>ComfyUI 서버의 연결 상태를 테스트합니다.</p>
+          <button id="testComfyUIButton" onclick="testComfyUIConnection()">ComfyUI 서버 테스트</button>
+          <div id="testComfyUIResult" class="result"></div>
+        </div>
       </div>
     </div>
     
@@ -688,6 +703,9 @@
       try {
         setButtonLoading('generatePromptButton', true);
         
+        // 로컬 스토리지에서 최신 토큰 가져오기 (항상 최신 상태 유지)
+        authToken = localStorage.getItem('authToken');
+        
         if (!authToken) {
           document.getElementById('generatePromptResult').textContent = '로그인이 필요합니다.';
           return;
@@ -709,6 +727,194 @@
         document.getElementById('generatePromptResult').textContent = `오류: ${err.message}`;
       } finally {
         setButtonLoading('generatePromptButton', false);
+      }
+    }
+    
+    // ComfyUI로 이미지 생성 함수
+    async function generateDiaryImage() {
+      // 타임아웃 관리를 위한 컨트롤러 설정
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2400000); // 40분 타임아웃
+      
+      try {
+        setButtonLoading('generateImageButton', true);
+        
+        // 결과 표시 영역과 이미지 컨테이너 초기화
+        document.getElementById('generateImageResult').textContent = '준비 중...';
+        document.getElementById('generatedImageContainer').innerHTML = '';
+        
+        // 로컬 스토리지에서 최신 토큰 가져오기 (항상 최신 상태 유지)
+        authToken = localStorage.getItem('authToken');
+        
+        if (!authToken) {
+          document.getElementById('generateImageResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        console.log('사용 중인 인증 토큰:', authToken);
+        
+        const id = document.getElementById('diaryId').value;
+        if (!id) {
+          document.getElementById('generateImageResult').textContent = '일기 ID를 입력해주세요.';
+          return;
+        }
+        
+        // 서버 상태 체크 (선택적)
+        try {
+          document.getElementById('generateImageResult').textContent = '서버 상태 확인 중...';
+          
+          const pingResponse = await fetch(`${API_URL}/ping`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          }).catch(err => {
+            console.error('백엔드 서버 핑 오류:', err);
+            throw new Error('백엔드 서버에 연결할 수 없습니다.');
+          });
+          
+          if (!pingResponse.ok) {
+            throw new Error('백엔드 서버가 응답했지만 상태가 좋지 않습니다.');
+          }
+        } catch (pingError) {
+          document.getElementById('generateImageResult').textContent = `서버 연결 오류: ${pingError.message}`;
+          console.error('서버 상태 확인 오류:', pingError);
+          return;
+        }
+        
+        // 먼저 프롬프트 생성 API 호출하여 프롬프트 가져오기
+        document.getElementById('generateImageResult').textContent = '프롬프트 생성 중...';
+        
+        let promptText;
+        try {
+          const promptResponse = await fetch(`${API_URL}/diaries/${id}/prompt`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          });
+          
+          if (!promptResponse.ok) {
+            throw new Error(`프롬프트 생성 실패 (${promptResponse.status})`);
+          }
+          
+          const promptData = await promptResponse.json();
+          if (!promptData.prompt) {
+            throw new Error('유효한 프롬프트가 반환되지 않았습니다.');
+          }
+          
+          promptText = promptData.prompt;
+          console.log('생성된 프롬프트:', promptText.substring(0, 100) + '...');
+          document.getElementById('generateImageResult').textContent = '프롬프트 생성 완료, 이미지 생성 시작...';
+        } catch (promptError) {
+          document.getElementById('generateImageResult').textContent = `프롬프트 생성 오류: ${promptError.message}`;
+          console.error('프롬프트 생성 오류:', promptError);
+          return;
+        }
+        
+        // 이미지 생성 시작 메시지
+        document.getElementById('generateImageResult').textContent = 
+          '이미지 생성 중... (ComfyUI 작업 특성상 최대 40분까지 소요될 수 있습니다. 잠시만 기다려주세요)';
+        
+        // ComfyUI 이미지 생성 API 호출 - 생성된 프롬프트 전달
+        const response = await fetch(`${API_URL}/diaries/${id}/generate-image`, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ prompt: promptText }),
+          signal: controller.signal
+        });
+        
+        // 응답 상태 코드와 전체 응답 로깅
+        console.log('응답 상태 코드:', response.status);
+        
+        try {
+          const data = await response.json();
+          console.log('서버 응답 데이터:', data);
+          
+          if (response.ok) {
+            // 성공 시 결과 표시
+            document.getElementById('generateImageResult').textContent = '이미지 생성 성공!';
+            
+            // 생성된 이미지 표시
+            if (data.photo) {
+              const imageContainer = document.getElementById('generatedImageContainer');
+              const img = document.createElement('img');
+              // API 경로에 따라 이미지 경로 설정 (경로가 이미 절대 경로인 경우와 상대 경로인 경우 모두 처리)
+              img.src = data.photo.startsWith('http') ? data.photo : 
+                       data.photo.startsWith('/') ? `${API_URL}${data.photo}` : `${API_URL}/${data.photo}`;
+              img.alt = '생성된 이미지';
+              img.style.maxWidth = '100%';
+              img.style.maxHeight = '400px';
+              img.style.border = '1px solid #ddd';
+              img.style.borderRadius = '5px';
+              img.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
+              
+              imageContainer.innerHTML = '';
+              imageContainer.appendChild(img);
+              
+              // 결과 JSON도 표시
+              document.getElementById('generateImageResult').textContent += '\n\n' + JSON.stringify(data, null, 2);
+            }
+          } else {
+            // 오류 시 상세 메시지 표시
+            document.getElementById('generateImageResult').textContent = `오류 (${response.status}): ${data.message || data.error || '이미지 생성에 실패했습니다.'}\n\n상세 정보: ${JSON.stringify(data, null, 2)}`;
+          }
+        } catch (parseError) {
+          console.error('응답 파싱 오류:', parseError);
+          document.getElementById('generateImageResult').textContent = `오류 (${response.status}): 서버 응답을 처리할 수 없습니다. 개발자 도구 콘솔을 확인하세요.`;
+        }
+      } catch (err) {
+        console.error('이미지 생성 오류:', err);
+        // AbortError인 경우 타임아웃 메시지 표시
+        if (err.name === 'AbortError') {
+          document.getElementById('generateImageResult').textContent = '요청 타임아웃: 이미지 생성에 너무 오랜 시간이 소요되어 요청이 취소되었습니다.';
+        } else {
+          document.getElementById('generateImageResult').textContent = `오류: ${err.message}`;
+        }
+      } finally {
+        // 타임아웃 해제
+        clearTimeout(timeoutId);
+        setButtonLoading('generateImageButton', false);
+      }
+    }
+    
+    // ComfyUI 서버 연결 테스트 함수
+    async function testComfyUIConnection() {
+      try {
+        setButtonLoading('testComfyUIButton', true);
+        
+        // 결과 영역 초기화
+        document.getElementById('testComfyUIResult').textContent = 'ComfyUI 서버 연결 테스트 중...';
+        
+        // 로컬 스토리지에서 최신 토큰 가져오기
+        authToken = localStorage.getItem('authToken');
+        
+        if (!authToken) {
+          document.getElementById('testComfyUIResult').textContent = '로그인이 필요합니다.';
+          return;
+        }
+        
+        // 테스트 API 호출
+        const response = await fetch(`${API_URL}/test-comfyui`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        console.log('ComfyUI 테스트 결과:', data);
+        
+        if (response.ok) {
+          document.getElementById('testComfyUIResult').textContent = 
+            `테스트 성공! 응답 시간: ${data.response_time_ms}ms\n\n` + 
+            `ComfyUI 서버 URL: ${data.comfyui.url}\n` +
+            `워크플로우 파일: ${data.comfyui.workflow_test}\n\n` +
+            JSON.stringify(data, null, 2);
+        } else {
+          document.getElementById('testComfyUIResult').textContent = 
+            `테스트 실패: ${data.message || '알 수 없는 오류'}\n\n` + 
+            JSON.stringify(data, null, 2);
+        }
+      } catch (err) {
+        console.error('ComfyUI 테스트 오류:', err);
+        document.getElementById('testComfyUIResult').textContent = `오류: ${err.message}`;
+      } finally {
+        setButtonLoading('testComfyUIButton', false);
       }
     }
     
