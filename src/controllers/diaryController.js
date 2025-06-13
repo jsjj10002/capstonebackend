@@ -10,15 +10,14 @@ const fetch = require('node-fetch');
 // 새 일기 작성
 const createDiary = async (req, res) => {
   try {
-    const { title, content, mood, tags } = req.body;
+    const { content, date, artStyle } = req.body;
     
-    // 기본 일기 데이터 구성
+    // 기본 일기 데이터 구성 (title, mood, tags 제거)
     const diaryData = {
       user: req.user._id,
-      title,
       content,
-      mood: mood || '기타',
-      tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim())) : [],
+      date: date ? new Date(date) : new Date(),
+      artStyle: artStyle || 'Makoto Shinkai',
       photos: [],
     };
     
@@ -26,24 +25,6 @@ const createDiary = async (req, res) => {
     if (req.files && req.files.length > 0) {
       // 사진 URL 추가
       diaryData.photos = req.files.map(file => `/uploads/${file.filename}`);
-    }
-    
-    // 태그와 무드 자동 분석 (입력값이 없는 경우)
-    if (!tags || tags.length === 0 || !mood || mood === '기타') {
-      try {
-        const analysis = await analyzeDiaryContent(title, content);
-        
-        if (!tags || tags.length === 0) {
-          diaryData.tags = analysis.tags;
-        }
-        
-        if (!mood || mood === '기타') {
-          diaryData.mood = analysis.mood;
-        }
-      } catch (error) {
-        console.error('일기 내용 분석 오류:', error);
-        // 분석 실패 시에도 일기는 저장 진행
-      }
     }
     
     // 일기 생성
@@ -107,7 +88,7 @@ const getDiaryById = async (req, res) => {
 // 일기 수정
 const updateDiary = async (req, res) => {
   try {
-    const { title, content, mood, tags } = req.body;
+    const { content, date, artStyle } = req.body;
     const diary = await Diary.findById(req.params.id);
     
     if (!diary) {
@@ -121,32 +102,10 @@ const updateDiary = async (req, res) => {
     
     // 업데이트할 데이터
     const updateData = {
-      title: title || diary.title,
       content: content || diary.content,
-      mood: mood || diary.mood,
-      tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim())) : diary.tags,
+      date: date ? new Date(date) : diary.date,
+      artStyle: artStyle || diary.artStyle,
     };
-    
-    // 태그와 무드 자동 분석 (입력값이 없는 경우)
-    if ((!tags || tags.length === 0) || (!mood || mood === '기타')) {
-      try {
-        const analysis = await analyzeDiaryContent(
-          updateData.title,
-          updateData.content
-        );
-        
-        if (!tags || tags.length === 0) {
-          updateData.tags = analysis.tags;
-        }
-        
-        if (!mood || mood === '기타') {
-          updateData.mood = analysis.mood;
-        }
-      } catch (error) {
-        console.error('일기 내용 분석 오류:', error);
-        // 분석 실패 시에도 일기는 저장 진행
-      }
-    }
     
     // 새 사진이 업로드된 경우
     if (req.files && req.files.length > 0) {
@@ -239,12 +198,26 @@ const generateImagePromptFromDiary = async (req, res) => {
       return res.status(403).json({ message: '권한이 없습니다.' });
     }
     
+    // 사용자 정보 조회 (인물 정보 포함)
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: '사용자 정보를 찾을 수 없습니다.' });
+    }
+    
+    // 사용자 인물 정보 구성
+    const userInfo = {
+      gender: user.gender || '기타',
+      clothing: user.clothing || '',
+      hairstyle: user.hairstyle || '',
+      accessories: user.accessories || '',
+      appearance: user.appearance || ''
+    };
+    
     // 이미지 생성 프롬프트 생성
     const prompt = await generateImagePrompt(
-      diary.title,
       diary.content,
-      diary.tags,
-      diary.mood
+      diary.artStyle || 'Makoto Shinkai',
+      userInfo
     );
     
     // 세션에 프롬프트 저장 (Redis 등을 사용하는 것이 더 좋습니다만, 예시로 세션 사용)
@@ -307,11 +280,20 @@ const generateDiaryImageWithComfy = async (req, res) => {
     // 프롬프트가 없는 경우 새로 생성
     else {
       console.log('저장된 프롬프트 없음, 새로 생성합니다');
+      
+      // 사용자 인물 정보 구성
+      const userInfo = {
+        gender: user.gender || '기타',
+        clothing: user.clothing || '',
+        hairstyle: user.hairstyle || '',
+        accessories: user.accessories || '',
+        appearance: user.appearance || ''
+      };
+      
       prompt = await generateImagePrompt(
-        diary.title,
         diary.content,
-        diary.tags,
-        diary.mood
+        diary.artStyle || 'Makoto Shinkai',
+        userInfo
       );
     }
     
@@ -323,8 +305,8 @@ const generateDiaryImageWithComfy = async (req, res) => {
     
     console.log('최종 사용 프롬프트:', prompt.substring(0, 100) + '...');
     
-    // ComfyUI 워크플로우 로드
-    const workflowPath = path.join(__dirname, '..', '..', 'comfytest.json');
+    // ComfyUI 워크플로우 로드 - Makoto Shinkai workflow 사용
+    const workflowPath = path.join(__dirname, '..', '..', 'Makoto Shinkai workflow.json');
     if (!fs.existsSync(workflowPath)) {
       console.error('ComfyUI 워크플로우 파일을 찾을 수 없음:', workflowPath);
       return res.status(500).json({ message: 'ComfyUI 워크플로우 파일을 찾을 수 없습니다.' });
@@ -332,13 +314,6 @@ const generateDiaryImageWithComfy = async (req, res) => {
     
     console.log(`ComfyUI 워크플로우 파일 로드: ${workflowPath}`);
     const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
-    
-    // 워크플로우 상태 확인
-    console.log('워크플로우 노드 ID 확인:');
-    console.log('노드 46 (LoadImage) 존재 여부:', !!workflow['46']);
-    console.log('노드 54 (CLIPTextEncode) 존재 여부:', !!workflow['54']);
-    console.log('노드 56 (CLIPTextEncode) 존재 여부:', !!workflow['56']);
-    console.log('노드 51 (SaveImage) 존재 여부:', !!workflow['51']);
     
     // 워크플로우 커스터마이징
     console.log(`워크플로우 커스터마이징: 
@@ -350,19 +325,6 @@ const generateDiaryImageWithComfy = async (req, res) => {
       prompt: prompt,
       imagePath: profilePhotoPath
     });
-    
-    // 프롬프트가 노드에 제대로 설정되었는지 확인
-    if (customizedWorkflow['54']) {
-      console.log('노드 54 프롬프트 설정값:', customizedWorkflow['54'].inputs.text.substring(0, 50) + '...');
-    }
-    if (customizedWorkflow['56']) {
-      console.log('노드 56 프롬프트 설정값:', customizedWorkflow['56'].inputs.text.substring(0, 50) + '...');
-    }
-    
-    // SaveImage 노드 설정 확인
-    if (customizedWorkflow['51']) {
-      console.log('노드 51 (SaveImage) 설정:', JSON.stringify(customizedWorkflow['51'].inputs));
-    }
     
     // ComfyUI 서버 상태 확인
     const COMFY_SERVER = req.app.locals.COMFY_SERVER_URL || 'http://127.0.0.1:8188';
@@ -422,6 +384,44 @@ const generateDiaryImageWithComfy = async (req, res) => {
   }
 };
 
+// 월별 일기 조회 API 추가
+const getDiariesByMonth = async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    
+    if (!year || !month) {
+      return res.status(400).json({ 
+        message: '년도와 월을 지정해주세요. 예: ?year=2025&month=1' 
+      });
+    }
+    
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+    
+    const diaries = await Diary.find({
+      user: req.user._id,
+      date: {
+        $gte: startDate,
+        $lte: endDate,
+      },
+    })
+    .sort({ date: -1 })
+    .select('date photos _id');
+    
+    // 요청한 형식에 맞게 데이터 변환
+    const formattedDiaries = diaries.map(diary => ({
+      date: diary.date.toISOString().split('T')[0], // YYYY-MM-DD 형식
+      id: diary._id,
+      thumbnail: diary.photos.length > 0 ? diary.photos[0] : null,
+    }));
+    
+    res.json(formattedDiaries);
+  } catch (error) {
+    console.error('월별 일기 조회 오류:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+};
+
 module.exports = {
   createDiary,
   getDiaries,
@@ -431,4 +431,5 @@ module.exports = {
   searchDiaries,
   generateImagePromptFromDiary,
   generateDiaryImageWithComfy,
+  getDiariesByMonth,
 }; 

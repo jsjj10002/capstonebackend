@@ -28,6 +28,27 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    gender: {
+      type: String,
+      enum: ['남성', '여성', '기타'],
+      default: '기타',
+    },
+    clothing: {
+      type: String,
+      default: '',
+    },
+    hairstyle: {
+      type: String,
+      default: '',
+    },
+    accessories: {
+      type: String,
+      default: '',
+    },
+    appearance: {
+      type: String,
+      default: '',
+    },
     createdAt: {
       type: Date,
       default: Date.now,

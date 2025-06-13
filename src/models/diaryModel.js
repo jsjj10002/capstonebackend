@@ -9,12 +9,16 @@ const diarySchema = new mongoose.Schema(
     },
     title: {
       type: String,
-      required: [true, '제목은 필수입니다.'],
       trim: true,
+      default: '',
     },
     content: {
       type: String,
       required: [true, '내용은 필수입니다.'],
+    },
+    date: {
+      type: Date,
+      default: Date.now,
     },
     mood: {
       type: String,
@@ -23,7 +27,7 @@ const diarySchema = new mongoose.Schema(
     },
     photos: [
       {
-        type: String, // 이미지 URL을 저장
+        type: String,
       },
     ],
     tags: [
@@ -31,6 +35,11 @@ const diarySchema = new mongoose.Schema(
         type: String,
       },
     ],
+    artStyle: {
+      type: String,
+      enum: ['Makoto Shinkai', 'Anime', 'Realistic', 'Watercolor', 'Oil Painting'],
+      default: 'Makoto Shinkai',
+    },
     createdAt: {
       type: Date,
       default: Date.now,
@@ -43,6 +52,8 @@ const diarySchema = new mongoose.Schema(
 
 // 검색을 위한 인덱스 생성
 diarySchema.index({ title: 'text', content: 'text', tags: 'text' });
+// 날짜별 조회를 위한 인덱스 추가
+diarySchema.index({ user: 1, date: -1 });
 
 const Diary = mongoose.model('Diary', diarySchema);
 

@@ -25,6 +25,28 @@ const personSchema = new mongoose.Schema(
       type: String, // 추가 메모
       default: '',
     },
+    // 인물 스타일 정보 추가
+    gender: {
+      type: String,
+      enum: ['남성', '여성', '기타'],
+      default: '기타',
+    },
+    clothing: {
+      type: String,  // 의상 정보
+      default: '',
+    },
+    hairstyle: {
+      type: String,  // 헤어스타일 정보
+      default: '',
+    },
+    accessories: {
+      type: String,  // 악세사리 정보
+      default: '',
+    },
+    appearance: {
+      type: String,  // 기타 외모 특징
+      default: '',
+    },
     createdAt: {
       type: Date,
       default: Date.now,

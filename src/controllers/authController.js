@@ -89,6 +89,11 @@ const getUserProfile = async (req, res) => {
       username: user.username,
       email: user.email,
       profilePhoto: user.profilePhoto,
+      gender: user.gender,
+      clothing: user.clothing,
+      hairstyle: user.hairstyle,
+      accessories: user.accessories,
+      appearance: user.appearance,
     });
   } catch (error) {
     console.error('프로필 조회 오류:', error);
@@ -121,9 +126,65 @@ const updateProfilePhoto = async (req, res) => {
       username: updatedUser.username,
       email: updatedUser.email,
       profilePhoto: updatedUser.profilePhoto,
+      gender: updatedUser.gender,
+      clothing: updatedUser.clothing,
+      hairstyle: updatedUser.hairstyle,
+      accessories: updatedUser.accessories,
+      appearance: updatedUser.appearance,
     });
   } catch (error) {
     console.error('프로필 사진 업데이트 오류:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+};
+
+// 프로필 정보 업데이트
+const updateProfileInfo = async (req, res) => {
+  try {
+    const { username, email, gender, clothing, hairstyle, accessories, appearance } = req.body;
+
+    // 이메일 중복 확인 (기존 이메일과 다른 경우)
+    if (email && email !== req.user.email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({ message: '이미 사용 중인 이메일입니다.' });
+      }
+    }
+
+    // 업데이트할 데이터 구성
+    const updateData = {};
+    if (username) updateData.username = username;
+    if (email) updateData.email = email;
+    if (gender) updateData.gender = gender;
+    if (clothing !== undefined) updateData.clothing = clothing;
+    if (hairstyle !== undefined) updateData.hairstyle = hairstyle;
+    if (accessories !== undefined) updateData.accessories = accessories;
+    if (appearance !== undefined) updateData.appearance = appearance;
+
+    // 사용자 프로필 정보 업데이트
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      updateData,
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+    }
+
+    res.json({
+      _id: updatedUser._id,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      profilePhoto: updatedUser.profilePhoto,
+      gender: updatedUser.gender,
+      clothing: updatedUser.clothing,
+      hairstyle: updatedUser.hairstyle,
+      accessories: updatedUser.accessories,
+      appearance: updatedUser.appearance,
+    });
+  } catch (error) {
+    console.error('프로필 정보 업데이트 오류:', error);
     res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
 };
@@ -133,4 +194,5 @@ module.exports = {
   loginUser,
   getUserProfile,
   updateProfilePhoto,
+  updateProfileInfo,
 }; 

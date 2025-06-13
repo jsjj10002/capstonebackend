@@ -9,8 +9,8 @@ const customizeWorkflow = (workflow, { prompt, imagePath }) => {
   console.log('워크플로우 커스터마이징 시작...');
   const modifiedWorkflow = JSON.parse(JSON.stringify(workflow));
   
-  // 워크플로우에 모든 필요한 노드가 있는지 확인
-  const requiredNodes = ['46', '54', '56', '51'];
+  // 워크플로우에 모든 필요한 노드가 있는지 확인 (Makoto Shinkai workflow 기준)
+  const requiredNodes = ['42', '6', '7', '9']; // LoadImage, CLIPTextEncode(positive), CLIPTextEncode(negative), SaveImage
   let missingNodes = [];
   
   for (const nodeId of requiredNodes) {
@@ -24,8 +24,8 @@ const customizeWorkflow = (workflow, { prompt, imagePath }) => {
     console.log('워크플로우에 있는 노드:', Object.keys(modifiedWorkflow).join(', '));
   }
   
-  // 입력 이미지 경로 수정 (프로필 사진)
-  if (modifiedWorkflow['46']) {
+  // 입력 이미지 경로 수정 (프로필 사진) - 노드 42
+  if (modifiedWorkflow['42']) {
     // 경로에서 파일 이름만 추출 (OS 호환성을 위해 path 모듈 사용)
     const path = require('path');
     const fs = require('fs'); 
@@ -37,53 +37,62 @@ const customizeWorkflow = (workflow, { prompt, imagePath }) => {
       console.log(`이미지 파일 확인됨: ${imagePath} (${fs.statSync(imagePath).size} 바이트)`);
     }
     
-    // 이미지 경로 설정
-    modifiedWorkflow['46'].inputs.image = imagePath;
-    console.log(`이미지 경로 설정 완료: ${imagePath}`);
+    // 이미지 파일명만 추출하여 설정
+    const imageFileName = path.basename(imagePath);
+    modifiedWorkflow['42'].widgets_values[0] = imageFileName;
+    console.log(`이미지 파일명 설정 완료: ${imageFileName}`);
     
-    // Node 46의 class_type 확인
-    console.log(`노드 46 타입: ${modifiedWorkflow['46'].class_type}`);
+    // Node 42의 class_type 확인
+    console.log(`노드 42 타입: ${modifiedWorkflow['42'].type}`);
   } else {
-    console.error('이미지 로드 노드(46)가 없어 프로필 사진을 설정할 수 없습니다.');
+    console.error('이미지 로드 노드(42)가 없어 프로필 사진을 설정할 수 없습니다.');
   }
   
-  // 프롬프트 텍스트 설정
-  if (modifiedWorkflow['54']) {
-    modifiedWorkflow['54'].inputs.text = prompt;
-    console.log(`노드 54에 프롬프트 설정 완료 (${prompt.length}자)`);
+  // 정방향 프롬프트 텍스트 설정 - 노드 6
+  if (modifiedWorkflow['6']) {
+    modifiedWorkflow['6'].widgets_values[0] = prompt;
+    console.log(`노드 6에 정방향 프롬프트 설정 완료 (${prompt.length}자)`);
     console.log('프롬프트 미리보기:', prompt.substring(0, 100) + '...');
   } else {
-    console.error('텍스트 인코딩 노드(54)가 없어 프롬프트를 설정할 수 없습니다.');
+    console.error('정방향 텍스트 인코딩 노드(6)가 없어 프롬프트를 설정할 수 없습니다.');
   }
   
-  if (modifiedWorkflow['56']) {
-    modifiedWorkflow['56'].inputs.text = prompt;
-    console.log(`노드 56에 프롬프트 설정 완료 (${prompt.length}자)`);
+  // 부정방향 프롬프트는 기본값 유지 - 노드 7
+  if (modifiedWorkflow['7']) {
+    console.log(`노드 7에 부정방향 프롬프트 확인: ${modifiedWorkflow['7'].widgets_values[0].substring(0, 50)}...`);
   } else {
-    console.error('텍스트 인코딩 노드(56)가 없어 프롬프트를 설정할 수 없습니다.');
+    console.error('부정방향 텍스트 인코딩 노드(7)가 없습니다.');
   }
   
-  // 랜덤 시드 생성
+  // 랜덤 시드 생성 - Makoto Shinkai workflow의 샘플러 노드들 확인
   const seed1 = Math.floor(Math.random() * 1000000000000000);
   const seed2 = Math.floor(Math.random() * 1000000000000000);
   
-  if (modifiedWorkflow['50']) {
-    modifiedWorkflow['50'].inputs.seed = seed1;
-    console.log(`KSampler 노드(50)에 시드 설정: ${seed1}`);
+  // 노드 56이 주요 샘플러인 것 같으므로 확인
+  if (modifiedWorkflow['56']) {
+    // 시드 설정 (샘플러 노드의 구조에 따라 조정 필요)
+    if (modifiedWorkflow['56'].widgets_values && modifiedWorkflow['56'].widgets_values.length > 0) {
+      // 첫 번째 값이 시드인 경우가 많음
+      modifiedWorkflow['56'].widgets_values[0] = seed1;
+      console.log(`샘플러 노드(56)에 시드 설정: ${seed1}`);
+    }
   } else {
-    console.error('KSampler 노드(50)가 없어 시드를 설정할 수 없습니다.');
+    console.log('샘플러 노드(56)가 없습니다.');
   }
   
-  if (modifiedWorkflow['58']) {
-    modifiedWorkflow['58'].inputs.seed = seed2;
-    console.log(`KSampler 노드(58)에 시드 설정: ${seed2}`);
-  } else {
-    console.error('KSampler 노드(58)가 없어 시드를 설정할 수 없습니다.');
+  // 다른 샘플러 노드들도 확인
+  if (modifiedWorkflow['21']) {
+    if (modifiedWorkflow['21'].widgets_values && modifiedWorkflow['21'].widgets_values.length > 0) {
+      modifiedWorkflow['21'].widgets_values[0] = seed2;
+      console.log(`샘플러 노드(21)에 시드 설정: ${seed2}`);
+    }
   }
   
-  // SaveImage 노드 설정 확인
-  if (modifiedWorkflow['51']) {
-    console.log(`SaveImage 노드 설정: ${JSON.stringify(modifiedWorkflow['51'].inputs)}`);
+  // SaveImage 노드 설정 확인 - 노드 9
+  if (modifiedWorkflow['9']) {
+    console.log(`SaveImage 노드 설정: ${JSON.stringify(modifiedWorkflow['9'].widgets_values)}`);
+  } else {
+    console.error('SaveImage 노드(9)가 없습니다.');
   }
   
   console.log('워크플로우 커스터마이징 완료');
@@ -234,7 +243,7 @@ const runComfyWorkflow = async (workflow) => {
       console.error('사용된 노드 ID:', Object.keys(workflow).join(', '));
       
       // 중요 노드 확인
-      const criticalNodes = ['46', '54', '56'];
+      const criticalNodes = ['42', '6', '7'];
       for (const nodeId of criticalNodes) {
         if (!workflow[nodeId]) {
           console.error(`중요 노드 누락: ${nodeId}`);
@@ -339,7 +348,7 @@ const runComfyWorkflow = async (workflow) => {
               console.log(`- 기록된 노드 ID: ${nodeIds.join(', ')}`);
               
               // 노드별 진행 상태 확인
-              for (const nodeId of ['50', '58']) {
+              for (const nodeId of ['56', '21']) {
                 if (history[prompt_id].nodes[nodeId]) {
                   console.log(`- 노드 ${nodeId} 상태:`, JSON.stringify(history[prompt_id].nodes[nodeId]).substring(0, 100));
                 }
@@ -369,14 +378,14 @@ const runComfyWorkflow = async (workflow) => {
               }
             }
             
-            // SaveImage 노드 찾기 (노드 51)
-            if (outputs['51'] && outputs['51'].images && outputs['51'].images.length > 0) {
-              const imageName = outputs['51'].images[0].filename;
+            // SaveImage 노드 찾기 (노드 9)
+            if (outputs['9'] && outputs['9'].images && outputs['9'].images.length > 0) {
+              const imageName = outputs['9'].images[0].filename;
               imageUrl = `${COMFY_SERVER}/view?filename=${imageName}`;
-              console.log(`SaveImage 노드(51)에서 이미지 생성 완료! 파일명: ${imageName}, 소요 시간: ${retryCount}초`);
+              console.log(`SaveImage 노드(9)에서 이미지 생성 완료! 파일명: ${imageName}, 소요 시간: ${retryCount}초`);
               break;
             } 
-            // 51번 노드에 이미지가 없을 경우 다른 노드에서도 이미지 찾기
+            // 9번 노드에 이미지가 없을 경우 다른 노드에서도 이미지 찾기
             else if (retryCount > 10) { // 충분히 기다린 후에 다른 노드 확인
               for (const nodeId in outputs) {
                 if (outputs[nodeId].images && outputs[nodeId].images.length > 0) {
@@ -385,7 +394,7 @@ const runComfyWorkflow = async (workflow) => {
                   console.log(`다른 노드(${nodeId})에서 이미지 발견! 파일명: ${imageName}, 소요 시간: ${retryCount}초`);
                   
                   // 출력 노드 정보 기록
-                  console.log(`출력 노드 ${nodeId} 타입: ${workflow[nodeId]?.class_type || '알 수 없음'}`);
+                  console.log(`출력 노드 ${nodeId} 타입: ${workflow[nodeId]?.type || '알 수 없음'}`);
                   console.log(`출력 노드 ${nodeId} 이미지 경로: ${imageName}`);
                   
                   // ComfyUI 출력 폴더에서 실제 파일 확인 요청

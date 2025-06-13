@@ -9,9 +9,11 @@ const {
   searchDiaries,
   generateImagePromptFromDiary,
   generateDiaryImageWithComfy,
+  getDiariesByMonth,
 } = require('../controllers/diaryController');
 const { protect } = require('../middleware/authMiddleware');
 const { uploadLocal } = require('../config/uploadConfig');
+const { uploadMultiple } = require('../middleware/uploadMiddleware');
 
 // 모든 라우트에 인증 미들웨어 적용
 router.use(protect);
@@ -24,6 +26,9 @@ router.get('/', getDiaries);
 
 // 일기 검색 라우트 - 이 라우트는 /:id 라우트보다 앞에 위치해야 함
 router.get('/search', searchDiaries);
+
+// 월별 일기 조회 라우트
+router.get('/by-month', getDiariesByMonth);
 
 // 특정 일기 조회 라우트
 router.get('/:id', getDiaryById);

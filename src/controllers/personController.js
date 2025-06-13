@@ -5,7 +5,7 @@ const path = require('path');
 // 인물 추가
 const createPerson = async (req, res) => {
   try {
-    const { name, relation, notes } = req.body;
+    const { name, relation, notes, gender, clothing, hairstyle, accessories, appearance } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ message: '인물 사진을 업로드해주세요.' });
@@ -21,6 +21,11 @@ const createPerson = async (req, res) => {
       relation: relation || '기타',
       photo,
       notes: notes || '',
+      gender: gender || '기타',
+      clothing: clothing || '',
+      hairstyle: hairstyle || '',
+      accessories: accessories || '',
+      appearance: appearance || '',
     });
 
     res.status(201).json(person);
@@ -65,7 +70,7 @@ const getPersonById = async (req, res) => {
 // 인물 정보 업데이트
 const updatePerson = async (req, res) => {
   try {
-    const { name, relation, notes } = req.body;
+    const { name, relation, notes, gender, clothing, hairstyle, accessories, appearance } = req.body;
     const person = await Person.findById(req.params.id);
 
     if (!person) {
@@ -81,6 +86,11 @@ const updatePerson = async (req, res) => {
       name: name || person.name,
       relation: relation || person.relation,
       notes: notes !== undefined ? notes : person.notes,
+      gender: gender || person.gender,
+      clothing: clothing !== undefined ? clothing : person.clothing,
+      hairstyle: hairstyle !== undefined ? hairstyle : person.hairstyle,
+      accessories: accessories !== undefined ? accessories : person.accessories,
+      appearance: appearance !== undefined ? appearance : person.appearance,
     };
 
     // 사진이 업데이트된 경우

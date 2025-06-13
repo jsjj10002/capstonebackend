@@ -87,15 +87,24 @@ const analyzeDiaryContent = async (title, content) => {
 };
 
 /**
- * 일기 내용을 바탕으로 이미지 생성 프롬프트 생성 함수
- * @param {string} diaryTitle - 일기 제목
+ * 일기 내용을 바탕으로 이미지 생성 프롬프트 생성 함수 (인물 정보 포함)
  * @param {string} diaryContent - 일기 내용
- * @param {Array<string>} diaryTags - 일기 태그
- * @param {string} diaryMood - 일기 무드
- * @returns {Promise<string>} - 생성된 이미지 프롬프트
+ * @param {string} artStyle - 화풍 (Makoto Shinkai, Anime, Realistic 등)
+ * @param {Object} userInfo - 사용자 인물 정보 (성별, 의상, 헤어스타일 등)
+ * @returns {Promise<string>} - 생성된 이미지 프롬프트 (콤마로 구분)
  */
-const generateImagePrompt = async (diaryTitle, diaryContent, diaryTags, diaryMood) => {
+const generateImagePrompt = async (diaryContent, artStyle = 'Makoto Shinkai', userInfo = {}) => {
   try {
+    // 기본 인물 정보 설정
+    const defaultUserInfo = {
+      gender: '기타',
+      clothing: '',
+      hairstyle: '',
+      accessories: '',
+      appearance: '',
+      ...userInfo
+    };
+
     // OpenAI API 호출
     const response = await openai.responses.create({
       model: "o4-mini",
@@ -107,42 +116,45 @@ const generateImagePrompt = async (diaryTitle, diaryContent, diaryTags, diaryMoo
               "type": "input_text",
               "text": `목표: 주어진 일기 내용을 바탕으로 Stable Diffusion에 사용할 이미지 생성 프롬프트를 만듭니다.
 
-              분석 및 포함할 요소:
+              중요 요구사항:
+              1. 인물 정보 필수 포함: 주인공의 성별, 의상, 헤어스타일, 악세사리 등을 반드시 포함
+              2. 콤마로 구분된 키워드 형식으로 출력
+              3. 화풍에 맞는 스타일 키워드 포함
               
-              1. 시간 및 장소 (필수):
-                 - 일기 태그와 내용에서 언급된 시간 (예: 아침, 오후, 저녁, 밤)을 반영
-                 - 일기 태그와 내용에서 언급된 장소 (예: 공원, 카페, 사무실)를 반영
+              포함할 요소 (순서대로):
               
-              2. 장면 묘사 (필수):
-                 - 일기에서 언급된 주요 장면과 환경 묘사
-                 - 인물이 포함된 경우에도 얼굴이나 개인적 특징은 묘사하지 않고 장면만 중심으로 표현
+              1. 인물 정보 (필수, 맨 앞에 위치):
+                 - 성별에 따른 인물 표현
+                 - 의상 정보 (구체적으로)
+                 - 헤어스타일 정보
+                 - 악세사리 정보
+                 - 기타 외모 특징
               
-              3. 행동/활동 (필수):
-                 - 일기 태그와 내용에서 언급된 활동이나 행동 (예: 산책, 식사, 독서)을 반영
-                 - 자연스러운 장면으로 묘사
+              2. 장면 및 행동:
+                 - 일기 내용에서 언급된 주요 장면
+                 - 인물의 행동이나 활동
               
-              4. 분위기/감정 (필수):
-                 - 일기의 mood와 내용에서 느껴지는 감정 상태를 반영
+              3. 배경 및 환경:
+                 - 장소 (예: park, cafe, room, street)
+                 - 시간대 (예: morning, afternoon, evening, night)
+                 - 날씨나 분위기
               
-              5. 배경 및 환경 (필수):
-                 - 시간과 장소에 어울리는 자연스러운 배경 묘사
-                 - 날씨, 조명 등의 환경 요소 포함
+              4. 화풍 및 품질 키워드:
+                 - 선택된 화풍에 맞는 스타일 키워드
+                 - 품질 관련 키워드 (high quality, detailed, masterpiece 등)
               
-              6. 스타일 지정 (필수):
-                 - 사실적인 사진 스타일, 고품질, 자연스러운 구도
-                 - "realistic photo, high quality, natural composition, good lighting" 등의 스타일 지정자 포함
-              
-              중요 제약조건:
-              - 일기 내용을 고려하여 한 장면만 묘사해야 합니다 (여러 장면이나 시퀀스가 아닌).
-              - 가장 중요하고 시각적으로 구현 가능한 장면을 선택하세요.
-              - 인물의 얼굴 특징은 포함하지 마세요. 인물이 포함된 경우 뒷모습이나 실루엣으로 묘사하세요.
-              - 프롬프트는 쉼표로 구분된 키워드 형식보다는 자연스러운 영어 문장으로 작성해주세요.
-              - 항상 사실적인 사진 스타일로 마무리하세요.
+              화풍별 키워드:
+              - Makoto Shinkai: "makoto shinkai style, anime, detailed background, cinematic lighting, beautiful colors"
+              - Anime: "anime style, manga style, cel shading, vibrant colors"
+              - Realistic: "realistic, photorealistic, high detail, natural lighting"
+              - Watercolor: "watercolor painting, soft colors, artistic, traditional art"
+              - Oil Painting: "oil painting, classical art, painterly, rich colors"
               
               출력 형식:
-              - 스테이블 디퓨전에 바로 입력할 수 있는 서술형 영어 프롬프트로 작성
-              - 영어로 작성하며, 글자수 제한 없음
-              - 한국어를 포함하지 않음`
+              - 콤마로 구분된 키워드들
+              - 영어로만 작성
+              - 인물 정보가 맨 앞에 오도록 구성
+              - 예시: "young woman, casual dress, long black hair, sitting in cafe, afternoon, warm lighting, makoto shinkai style, high quality"`
             }
           ]
         },
@@ -151,13 +163,16 @@ const generateImagePrompt = async (diaryTitle, diaryContent, diaryTags, diaryMoo
           "content": [
             {
               "type": "input_text",
-              "text": `일기 제목: ${diaryTitle}
+              "text": `일기 내용: ${diaryContent}
+
+              인물 정보:
+              - 성별: ${defaultUserInfo.gender}
+              - 의상: ${defaultUserInfo.clothing}
+              - 헤어스타일: ${defaultUserInfo.hairstyle}
+              - 악세사리: ${defaultUserInfo.accessories}
+              - 외모 특징: ${defaultUserInfo.appearance}
               
-              일기 내용: ${diaryContent}
-              
-              일기 태그: ${diaryTags.join(', ')}
-              
-              무드: ${diaryMood}`
+              화풍: ${artStyle}`
             }
           ]
         }
@@ -175,18 +190,59 @@ const generateImagePrompt = async (diaryTitle, diaryContent, diaryTags, diaryMoo
     });
 
     // 응답에서 생성된 텍스트 추출
-    const imagePrompt = response.output_text;
+    let imagePrompt = response.output_text.trim();
     console.log('OpenAI로부터 생성된 원본 프롬프트:', imagePrompt.substring(0, 100) + '...');
     
-    if (!imagePrompt || imagePrompt.trim() === '') {
+    if (!imagePrompt || imagePrompt === '') {
       throw new Error('OpenAI가 빈 프롬프트를 반환했습니다');
+    }
+    
+    // 콤마로 구분된 형식인지 확인하고, 아니면 기본 형식으로 변환
+    if (!imagePrompt.includes(',')) {
+      // 기본 프롬프트 구성
+      const genderMap = {
+        '남성': 'young man',
+        '여성': 'young woman',
+        '기타': 'person'
+      };
+      
+      const personDesc = genderMap[defaultUserInfo.gender] || 'person';
+      const styleMap = {
+        'Makoto Shinkai': 'makoto shinkai style, anime, detailed background, cinematic lighting',
+        'Anime': 'anime style, manga style, cel shading, vibrant colors',
+        'Realistic': 'realistic, photorealistic, high detail, natural lighting',
+        'Watercolor': 'watercolor painting, soft colors, artistic',
+        'Oil Painting': 'oil painting, classical art, painterly'
+      };
+      
+      imagePrompt = [
+        personDesc,
+        defaultUserInfo.clothing,
+        defaultUserInfo.hairstyle,
+        defaultUserInfo.accessories,
+        'beautiful scene',
+        styleMap[artStyle] || styleMap['Makoto Shinkai'],
+        'high quality, detailed, masterpiece'
+      ].filter(item => item && item.trim() !== '').join(', ');
     }
     
     return imagePrompt;
   } catch (error) {
     console.error('이미지 프롬프트 생성 오류:', error);
-    // 기본 프롬프트 반환
-    return 'A beautiful landscape with natural lighting, realistic photo, high quality.';
+    
+    // 기본 프롬프트 반환 (인물 정보 포함)
+    const genderMap = {
+      '남성': 'young man',
+      '여성': 'young woman', 
+      '기타': 'person'
+    };
+    
+    const personDesc = genderMap[userInfo.gender] || 'person';
+    const styleKeywords = artStyle === 'Makoto Shinkai' ? 
+      'makoto shinkai style, anime, detailed background, cinematic lighting' :
+      'high quality, detailed, beautiful';
+      
+    return `${personDesc}, ${userInfo.clothing || 'casual clothes'}, ${userInfo.hairstyle || 'natural hair'}, beautiful scene, ${styleKeywords}, masterpiece`;
   }
 };
 
