@@ -4,7 +4,9 @@ const {
   registerUser, 
   loginUser, 
   getUserProfile,
-  updateProfilePhoto
+  updateProfilePhoto,
+  updateUserProfile,
+  changePassword,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const { uploadLocal } = require('../config/uploadConfig');
@@ -20,5 +22,11 @@ router.get('/profile', protect, getUserProfile);
 
 // 프로필 사진 업데이트 라우트 (인증 필요)
 router.put('/profile/photo', protect, uploadLocal.single('profilePhoto'), updateProfilePhoto);
+
+// 프로필 정보 수정 라우트 (인증 필요)
+router.put('/profile', protect, updateUserProfile);
+
+// 비밀번호 변경 라우트 (인증 필요)
+router.put('/profile/password', protect, changePassword);
 
 module.exports = router; 

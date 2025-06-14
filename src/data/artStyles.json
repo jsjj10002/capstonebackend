@@ -1,0 +1,62 @@
+{
+  "artStyles": [
+    {
+      "id": "realistic",
+      "name": "사실적",
+      "displayName": "Realistic",
+      "description": "사실적이고 자연스러운 화풍",
+      "workflowFile": "comfytest.json",
+      "checkpointName": "juggernautXL_juggernautX.safetensors",
+      "requiredKeywords": ["realistic", "photorealistic", "highly detailed"],
+      "negativePrompt": "cartoon, anime, illustration, painting, drawing",
+      "steps": 20,
+      "cfg": 7,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras"
+    },
+    {
+      "id": "makoto_shinkai",
+      "name": "신카이 마코토",
+      "displayName": "Makoto Shinkai",
+      "description": "신카이 마코토 스타일의 아름답고 감성적인 화풍",
+      "workflowFile": "Makoto Shinkai workflow.json",
+      "checkpointName": "anyloraCheckpoint_bakedvaeBlessedFp16.safetensors",
+      "requiredKeywords": ["masterpiece", "best quality", "shinkai makoto", "cinematic composition", "dramatic lighting", "atmospheric perspective", "beautiful sky"],
+      "negativePrompt": "embedding:badhandv4, embedding:easynegative, (painting by bad-artist-anime:0.9), (painting by bad-artist:0.9), watermark, text, error, blurry, jpeg artifacts, cropped, worst quality, low quality, normal quality",
+      "loraFile": "Makoto Shinkai.safetensors",
+      "loraStrength": 1.0,
+      "steps": 30,
+      "cfg": 8,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras"
+    },
+    {
+      "id": "watercolor",
+      "name": "수채화",
+      "displayName": "Watercolor",
+      "description": "부드럽고 투명한 수채화 스타일",
+      "workflowFile": "comfytest.json",
+      "checkpointName": "dreamshaper_8.safetensors",
+      "requiredKeywords": ["watercolor painting", "soft colors", "artistic", "traditional media"],
+      "negativePrompt": "photo, realistic, 3d render, cgi",
+      "steps": 25,
+      "cfg": 8,
+      "sampler": "euler_a",
+      "scheduler": "normal"
+    },
+    {
+      "id": "oil_painting",
+      "name": "유화",
+      "displayName": "Oil Painting",
+      "description": "고전적인 유화 스타일",
+      "workflowFile": "comfytest.json",
+      "checkpointName": "deliberate_v3.safetensors",
+      "requiredKeywords": ["oil painting", "classical art", "brushstrokes", "canvas texture"],
+      "negativePrompt": "photo, digital art, anime, cartoon",
+      "steps": 30,
+      "cfg": 7.5,
+      "sampler": "dpmpp_sde",
+      "scheduler": "karras"
+    }
+  ]
+}

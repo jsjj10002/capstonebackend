@@ -5,85 +5,147 @@ const WebSocket = require('ws');
 const fetch = require('node-fetch');
 
 // 워크플로우 커스터마이징 함수
-const customizeWorkflow = (workflow, { prompt, imagePath }) => {
+const customizeWorkflow = (workflow, settings) => {
   console.log('워크플로우 커스터마이징 시작...');
   const modifiedWorkflow = JSON.parse(JSON.stringify(workflow));
   
-  // 워크플로우에 모든 필요한 노드가 있는지 확인
-  const requiredNodes = ['46', '54', '56', '51'];
-  let missingNodes = [];
+  const {
+    prompt,
+    imagePath,
+    checkpointName,
+    negativePrompt,
+    steps,
+    cfg,
+    sampler,
+    scheduler,
+    loraFile,
+    loraStrength
+  } = settings;
   
-  for (const nodeId of requiredNodes) {
-    if (!modifiedWorkflow[nodeId]) {
-      missingNodes.push(nodeId);
+  // 신카이 마코토 워크플로우인지 확인
+  const isMakotoWorkflow = workflow.nodes && Array.isArray(workflow.nodes);
+  
+  if (isMakotoWorkflow) {
+    // 신카이 마코토 워크플로우 처리 (새로운 형식)
+    console.log('신카이 마코토 워크플로우 감지됨');
+    
+    // 각 노드를 순회하며 설정 변경
+    for (const node of modifiedWorkflow.nodes) {
+      // 체크포인트 로더 노드 (CheckpointLoaderSimple)
+      if (node.type === 'CheckpointLoaderSimple' && checkpointName) {
+        node.widgets_values[0] = checkpointName;
+        console.log(`체크포인트 설정: ${checkpointName}`);
+      }
+      
+      // LoRA 로더 노드
+      if (node.type === 'LoraLoader' && loraFile) {
+        node.widgets_values[0] = loraFile;
+        node.widgets_values[1] = loraStrength || 1.0;
+        console.log(`LoRA 설정: ${loraFile}, 강도: ${loraStrength || 1.0}`);
+      }
+      
+      // 이미지 로드 노드
+      if (node.type === 'LoadImage' && imagePath) {
+        const imageFileName = path.basename(imagePath);
+        node.widgets_values[0] = imageFileName;
+        console.log(`이미지 파일 설정: ${imageFileName}`);
+      }
+      
+      // 긍정 프롬프트 노드
+      if (node.type === 'CLIPTextEncode' && node.id === 6 && prompt) {
+        node.widgets_values[0] = prompt;
+        console.log(`긍정 프롬프트 설정 (노드 6): ${prompt.substring(0, 50)}...`);
+      }
+      
+      // 부정 프롬프트 노드
+      if (node.type === 'CLIPTextEncode' && node.id === 7 && negativePrompt) {
+        node.widgets_values[0] = negativePrompt;
+        console.log(`부정 프롬프트 설정 (노드 7): ${negativePrompt.substring(0, 50)}...`);
+      }
+      
+      // KSampler 노드 설정
+      if (node.type === 'KSampler') {
+        const seed = Math.floor(Math.random() * 1000000000000000);
+        node.widgets_values[0] = seed; // seed
+        if (steps) node.widgets_values[2] = steps;
+        if (cfg) node.widgets_values[3] = cfg;
+        if (sampler) node.widgets_values[4] = sampler;
+        if (scheduler) node.widgets_values[5] = scheduler;
+        console.log(`KSampler 설정 - Steps: ${steps}, CFG: ${cfg}, Sampler: ${sampler}, Scheduler: ${scheduler}`);
+      }
+      
+      // BasicScheduler 노드의 steps 설정
+      if (node.type === 'BasicScheduler' && steps) {
+        node.widgets_values[1] = steps; // steps
+        console.log(`BasicScheduler steps 설정: ${steps}`);
+      }
+      
+      // KSamplerSelect 노드의 sampler 설정
+      if (node.type === 'KSamplerSelect' && sampler) {
+        node.widgets_values[0] = sampler;
+        console.log(`KSamplerSelect sampler 설정: ${sampler}`);
+      }
     }
-  }
-  
-  if (missingNodes.length > 0) {
-    console.error(`워크플로우에 필수 노드가 없습니다: ${missingNodes.join(', ')}`);
-    console.log('워크플로우에 있는 노드:', Object.keys(modifiedWorkflow).join(', '));
-  }
-  
-  // 입력 이미지 경로 수정 (프로필 사진)
-  if (modifiedWorkflow['46']) {
-    // 경로에서 파일 이름만 추출 (OS 호환성을 위해 path 모듈 사용)
-    const path = require('path');
-    const fs = require('fs'); 
+  } else {
+    // 기존 워크플로우 처리 (구형식)
+    console.log('기본 워크플로우 형식 감지됨');
     
-    // 파일 존재 확인
-    if (!fs.existsSync(imagePath)) {
-      console.error(`이미지 파일을 찾을 수 없습니다: ${imagePath}`);
-    } else {
-      console.log(`이미지 파일 확인됨: ${imagePath} (${fs.statSync(imagePath).size} 바이트)`);
+    // 체크포인트 설정 (노드 4)
+    if (modifiedWorkflow['4'] && checkpointName) {
+      modifiedWorkflow['4'].inputs.ckpt_name = checkpointName;
+      console.log(`체크포인트 설정: ${checkpointName}`);
     }
     
-    // 이미지 경로 설정
-    modifiedWorkflow['46'].inputs.image = imagePath;
-    console.log(`이미지 경로 설정 완료: ${imagePath}`);
+    // 입력 이미지 경로 수정 (프로필 사진)
+    if (modifiedWorkflow['46']) {
+      // 파일 존재 확인
+      if (!fs.existsSync(imagePath)) {
+        console.error(`이미지 파일을 찾을 수 없습니다: ${imagePath}`);
+      } else {
+        console.log(`이미지 파일 확인됨: ${imagePath} (${fs.statSync(imagePath).size} 바이트)`);
+      }
+      
+      // 이미지 경로 설정
+      modifiedWorkflow['46'].inputs.image = imagePath;
+      console.log(`이미지 경로 설정 완료: ${imagePath}`);
+    }
     
-    // Node 46의 class_type 확인
-    console.log(`노드 46 타입: ${modifiedWorkflow['46'].class_type}`);
-  } else {
-    console.error('이미지 로드 노드(46)가 없어 프로필 사진을 설정할 수 없습니다.');
-  }
-  
-  // 프롬프트 텍스트 설정
-  if (modifiedWorkflow['54']) {
-    modifiedWorkflow['54'].inputs.text = prompt;
-    console.log(`노드 54에 프롬프트 설정 완료 (${prompt.length}자)`);
-    console.log('프롬프트 미리보기:', prompt.substring(0, 100) + '...');
-  } else {
-    console.error('텍스트 인코딩 노드(54)가 없어 프롬프트를 설정할 수 없습니다.');
-  }
-  
-  if (modifiedWorkflow['56']) {
-    modifiedWorkflow['56'].inputs.text = prompt;
-    console.log(`노드 56에 프롬프트 설정 완료 (${prompt.length}자)`);
-  } else {
-    console.error('텍스트 인코딩 노드(56)가 없어 프롬프트를 설정할 수 없습니다.');
-  }
-  
-  // 랜덤 시드 생성
-  const seed1 = Math.floor(Math.random() * 1000000000000000);
-  const seed2 = Math.floor(Math.random() * 1000000000000000);
-  
-  if (modifiedWorkflow['50']) {
-    modifiedWorkflow['50'].inputs.seed = seed1;
-    console.log(`KSampler 노드(50)에 시드 설정: ${seed1}`);
-  } else {
-    console.error('KSampler 노드(50)가 없어 시드를 설정할 수 없습니다.');
-  }
-  
-  if (modifiedWorkflow['58']) {
-    modifiedWorkflow['58'].inputs.seed = seed2;
-    console.log(`KSampler 노드(58)에 시드 설정: ${seed2}`);
-  } else {
-    console.error('KSampler 노드(58)가 없어 시드를 설정할 수 없습니다.');
-  }
-  
-  // SaveImage 노드 설정 확인
-  if (modifiedWorkflow['51']) {
-    console.log(`SaveImage 노드 설정: ${JSON.stringify(modifiedWorkflow['51'].inputs)}`);
+    // 프롬프트 텍스트 설정
+    if (modifiedWorkflow['54']) {
+      modifiedWorkflow['54'].inputs.text = prompt;
+      console.log(`노드 54에 프롬프트 설정 완료 (${prompt.length}자)`);
+    }
+    
+    if (modifiedWorkflow['56']) {
+      modifiedWorkflow['56'].inputs.text = prompt;
+      console.log(`노드 56에 프롬프트 설정 완료`);
+    }
+    
+    // 부정 프롬프트 설정
+    if (modifiedWorkflow['55'] && negativePrompt) {
+      modifiedWorkflow['55'].inputs.text = negativePrompt;
+      console.log(`부정 프롬프트 설정: ${negativePrompt.substring(0, 50)}...`);
+    }
+    
+    // KSampler 설정
+    if (modifiedWorkflow['50']) {
+      const seed = Math.floor(Math.random() * 1000000000000000);
+      modifiedWorkflow['50'].inputs.seed = seed;
+      if (steps) modifiedWorkflow['50'].inputs.steps = steps;
+      if (cfg) modifiedWorkflow['50'].inputs.cfg = cfg;
+      if (sampler) modifiedWorkflow['50'].inputs.sampler_name = sampler;
+      if (scheduler) modifiedWorkflow['50'].inputs.scheduler = scheduler;
+      console.log(`KSampler 설정 - Steps: ${steps}, CFG: ${cfg}, Sampler: ${sampler}`);
+    }
+    
+    if (modifiedWorkflow['58']) {
+      const seed = Math.floor(Math.random() * 1000000000000000);
+      modifiedWorkflow['58'].inputs.seed = seed;
+      if (steps) modifiedWorkflow['58'].inputs.steps = steps;
+      if (cfg) modifiedWorkflow['58'].inputs.cfg = cfg;
+      if (sampler) modifiedWorkflow['58'].inputs.sampler_name = sampler;
+      if (scheduler) modifiedWorkflow['58'].inputs.scheduler = scheduler;
+    }
   }
   
   console.log('워크플로우 커스터마이징 완료');
@@ -514,7 +576,368 @@ const runComfyWorkflow = async (workflow) => {
   }
 };
 
+// 원본 워크플로우를 그대로 사용하는 함수
+const runOriginalWorkflow = async (workflowPath, prompt, imageName) => {
+  try {
+    console.log('원본 워크플로우 실행 시작...');
+    
+    if (!fs.existsSync(workflowPath)) {
+      throw new Error(`워크플로우 파일을 찾을 수 없습니다: ${workflowPath}`);
+    }
+    
+    const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+    
+    // 1. 워크플로우 형식 검증 및 변환 (메타데이터 정리)
+    let processedWorkflow = validateAndProcessWorkflow(workflow);
+    
+    // 2. 노드 연결 검증 및 복구
+    processedWorkflow = validateAndFixConnections(processedWorkflow);
+    
+    // API 형식 워크플로우 설정 업데이트
+    updateAPIWorkflowSettings(processedWorkflow, prompt, imageName);
+    
+    return await runComfyWorkflow(processedWorkflow);
+    
+  } catch (error) {
+    console.error('원본 워크플로우 실행 오류:', error);
+    throw error;
+  }
+};
+
+
+
+// API 형식 워크플로우 설정 업데이트 함수
+const updateAPIWorkflowSettings = (workflow, prompt, imageName) => {
+  console.log('API 워크플로우 설정 업데이트 시작...');
+  
+  for (const nodeId in workflow) {
+    const node = workflow[nodeId];
+    
+    // 긍정 프롬프트 노드 찾기 (CLIPTextEncode)
+    if (node.class_type === 'CLIPTextEncode') {
+      // 노드 6번이 긍정 프롬프트인지 확인 (네거티브가 아닌)
+      if (nodeId === '6' || (node.inputs.text && !node.inputs.text.includes('negative'))) {
+        node.inputs.text = prompt;
+        console.log(`프롬프트 설정 (노드 ${nodeId}): ${prompt.substring(0, 50)}...`);
+      }
+    }
+    
+    // 이미지 로드 노드 (LoadImage)
+    if (node.class_type === 'LoadImage' && imageName) {
+      node.inputs.image = imageName;
+      console.log(`이미지 파일 설정 (노드 ${nodeId}): ${imageName}`);
+    }
+    
+    // 시드 랜덤화 (KSampler)
+    if (node.class_type === 'KSampler' && node.inputs.seed !== undefined) {
+      const seed = Math.floor(Math.random() * 1000000000000000);
+      node.inputs.seed = seed;
+      console.log(`시드 설정 (노드 ${nodeId}): ${seed}`);
+    }
+    
+    // 시드 랜덤화 (SamplerCustom)
+    if (node.class_type === 'SamplerCustom' && node.inputs.noise_seed !== undefined) {
+      const seed = Math.floor(Math.random() * 1000000000000000);
+      node.inputs.noise_seed = seed;
+      console.log(`시드 설정 (노드 ${nodeId}): ${seed}`);
+    }
+  }
+  
+  console.log('API 워크플로우 설정 업데이트 완료');
+};
+
+const validateAndProcessWorkflow = (workflow) => {
+  console.log('워크플로우 형식 검증 시작...');
+  
+  // API 형식인지 확인 (노드 ID를 키로 하는 객체)
+  const workflowKeys = Object.keys(workflow);
+  const hasNumericKeys = workflowKeys.some(key => !isNaN(key));
+  const hasClassTypes = workflowKeys.some(key => 
+    workflow[key] && typeof workflow[key] === 'object' && 'class_type' in workflow[key]
+  );
+  
+  if (hasNumericKeys && hasClassTypes) {
+    console.log(`API 형식 워크플로우 감지: ${workflowKeys.length}개 노드`);
+    
+    // 메타데이터 제거 및 API 형식 정리
+    const cleanWorkflow = {};
+
+    // API 형식 검증
+    for (const nodeId in workflow) {
+      const node = workflow[nodeId];
+      if (!node.class_type) {
+        throw new Error(`노드 ${nodeId}에 class_type 속성이 없습니다.`);
+      }
+      if (!node.inputs) {
+        workflow[nodeId].inputs = {};
+      }
+
+      // 깨끗한 노드 객체 생성 (메타데이터 제거)
+      cleanWorkflow[nodeId] = {
+        class_type: node.class_type,
+        inputs: node.inputs || {}
+      };
+
+    }
+    console.log(`메타데이터 정리 완료: ${Object.keys(cleanWorkflow).length}개 노드`);
+    return workflow; // 이미 올바른 API 형식
+  }
+  
+  // UI 형식인지 확인 (nodes 배열이 있는 경우)
+  if (workflow.nodes && Array.isArray(workflow.nodes)) {
+    console.log(`UI 형식 워크플로우 감지: ${workflow.nodes.length}개 노드`);
+    
+    // API 형식으로 변환
+    const apiWorkflow = {};
+    
+    for (const node of workflow.nodes) {
+      if (!node.id || !node.type) {
+        console.warn(`노드 ID ${node.id}: type 또는 id 누락, 건너뜀`);
+        continue;
+      }
+      
+      apiWorkflow[node.id.toString()] = {
+        class_type: node.type,
+        inputs: {}
+      };
+      
+      // 위젯 값을 inputs에 추가
+      if (node.widgets_values && node.widgets_values.length > 0) {
+        const widgetMapping = getWidgetMapping(node.type);
+        widgetMapping.forEach((paramName, index) => {
+          if (index < node.widgets_values.length) {
+            apiWorkflow[node.id.toString()].inputs[paramName] = node.widgets_values[index];
+          }
+        });
+      }
+    }
+    
+    console.log(`UI→API 변환 완료: ${Object.keys(apiWorkflow).length}개 노드`);
+    return apiWorkflow;
+  }
+  
+  throw new Error('유효하지 않은 워크플로우 형식: API 형식도 UI 형식도 아닙니다.');
+};
+
+// 위젯 매핑 헬퍼 함수
+const getWidgetMapping = (nodeType) => {
+  const mappings = {
+    'CLIPTextEncode': ['text'],
+    'CheckpointLoaderSimple': ['ckpt_name'],
+    'LoadImage': ['image'],
+    'SaveImage': ['filename_prefix'],
+    'EmptyLatentImage': ['width', 'height', 'batch_size'],
+    'KSampler': ['seed', 'steps', 'cfg', 'sampler_name', 'scheduler', 'denoise'],
+    'SamplerCustom': ['add_noise', 'noise_seed', 'cfg'],
+    'VAELoader': ['vae_name'],
+    'CLIPLoader': ['clip_name'],
+    'LoraLoader': ['lora_name', 'strength_model', 'strength_clip'],
+    'VAEDecodeTiled': ['tile_size'],
+    'BasicScheduler': ['scheduler', 'steps', 'denoise'],
+    'SplitSigmas': ['step'],
+    'LatentUpscaleBy': ['upscale_method', 'scale_by']
+  };
+  return mappings[nodeType] || [];
+};
+
+// 완전한 노드 연결 매핑 (Makoto Shinkai 워크플로우 기준)
+const getCompleteNodeConnections = () => {
+  return {
+    '4': { // CheckpointLoaderSimple
+      inputs: {}
+    },
+    '5': { // EmptyLatentImage
+      inputs: {}
+    },
+    '6': { // CLIPTextEncode (긍정)
+      inputs: {
+        clip: ['10', 1]
+      }
+    },
+    '7': { // CLIPTextEncode (부정)
+      inputs: {
+        clip: ['10', 1]
+      }
+    },
+    '9': { // SaveImage
+      inputs: {
+        images: ['38', 0]
+      }
+    },
+    '10': { // LoraLoader
+      inputs: {
+        model: ['4', 0],
+        clip: ['16', 0]
+      }
+    },
+    '13': { // VAELoader
+      inputs: {}
+    },
+    '15': { // CLIPLoader
+      inputs: {}
+    },
+    '16': { // CLIPSetLastLayer
+      inputs: {
+        clip: ['15', 0]
+      }
+    },
+    '19': { // FreeU_V2
+      inputs: {
+        model: ['10', 0]
+      }
+    },
+    '20': { // LatentUpscaleBy
+      inputs: {
+        samples: ['56', 1]
+      }
+    },
+    '21': { // KSampler
+      inputs: {
+        model: ['19', 0],
+        positive: ['6', 0],
+        negative: ['7', 0],
+        latent_image: ['20', 0]
+      }
+    },
+    '22': { // Anything Everywhere3
+      inputs: {
+        anything: ['46', 0],
+        anything3: ['13', 0]
+      }
+    },
+    '26': { // Prompts Everywhere
+      inputs: {
+        '+ve': ['6', 0],
+        '-ve': ['7', 0]
+      }
+    },
+    '38': { // VAEDecodeTiled
+      inputs: {
+        samples: ['21', 0],
+        vae: ['13', 0]
+      }
+    },
+    '42': { // LoadImage
+      inputs: {}
+    },
+    '45': { // IPAdapterUnifiedLoaderFaceID
+      inputs: {
+        model: ['19', 0]
+      }
+    },
+    '46': { // IPAdapterFaceID
+      inputs: {
+        model: ['45', 0],
+        ipadapter: ['45', 1],
+        image: ['42', 0]
+      }
+    },
+    '54': { // BasicScheduler
+      inputs: {
+        model: ['19', 0]
+      }
+    },
+    '55': { // SplitSigmas
+      inputs: {
+        sigmas: ['54', 0]
+      }
+    },
+    '56': { // SamplerCustom
+      inputs: {
+        model: ['19', 0],
+        positive: ['6', 0],
+        negative: ['7', 0],
+        sampler: ['58', 0],
+        sigmas: ['55', 0],
+        latent_image: ['5', 0]
+      }
+    },
+    '57': { // KSamplerSelect
+      inputs: {}
+    },
+    '58': { // DetailDaemonSamplerNode
+      inputs: {
+        sampler: ['57', 0]
+      }
+    }
+  };
+};
+
+// 연결 정보 복구 함수 개선
+const validateAndFixConnections = (workflow) => {
+  console.log('노드 연결 검증 시작...');
+  
+  const completeConnections = getCompleteNodeConnections();
+  
+  for (const nodeId in workflow) {
+    if (completeConnections[nodeId]) {
+      const expectedInputs = completeConnections[nodeId].inputs;
+      const currentNode = workflow[nodeId];
+      
+      // 누락된 입력 연결 복구
+      for (const inputName in expectedInputs) {
+        if (!currentNode.inputs[inputName]) {
+          currentNode.inputs[inputName] = expectedInputs[inputName];
+          console.log(`노드 ${nodeId}에 ${inputName} 연결 복구: ${expectedInputs[inputName]}`);
+        }
+      }
+    }
+  }
+  
+  console.log('노드 연결 검증 완료');
+  return workflow;
+};
+
+// 통합 이미지 생성 함수
+const generateImageWithComfyUI = async (prompt, inputImagePath) => {
+  try {
+    console.log('ComfyUI 이미지 생성 시작...');
+    console.log(`프롬프트: ${prompt.substring(0, 100)}...`);
+    console.log(`입력 이미지: ${inputImagePath}`);
+    
+    // Makoto Shinkai 워크플로우 파일 로드
+    const workflowPath = path.join(__dirname, '..', '..', 'Makoto Shinkai workflow.json');
+    
+    // 이미지 파일명 추출
+    const imageName = inputImagePath ? path.basename(inputImagePath) : null;
+    
+    // 원본 워크플로우 그대로 실행 (커스터마이징 없이)
+    const result = await runOriginalWorkflow(workflowPath, prompt, imageName);
+    
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+    
+    // 이미지를 uploads 폴더에 저장
+    const uploadDir = path.join(__dirname, '..', '..', 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    
+    const filename = `generated_${Date.now()}.png`;
+    const imagePath = path.join(uploadDir, filename);
+    
+    fs.writeFileSync(imagePath, result.imageData);
+    console.log(`생성된 이미지 저장 완료: ${imagePath}`);
+    
+    return {
+      success: true,
+      imageUrl: `/uploads/${filename}`,
+      localPath: imagePath
+    };
+    
+  } catch (error) {
+    console.error('ComfyUI 이미지 생성 오류:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 module.exports = {
   customizeWorkflow,
-  runComfyWorkflow
+  runComfyWorkflow,
+  runOriginalWorkflow,
+  generateImageWithComfyUI
 }; 

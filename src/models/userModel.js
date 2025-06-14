@@ -5,28 +5,29 @@ const userSchema = new mongoose.Schema(
   {
     username: {
       type: String,
-      required: [true, '사용자 이름은 필수입니다.'],
+      required: [true, '사용자명을 입력해주세요.'],
+      unique: true,
       trim: true,
     },
     email: {
       type: String,
-      required: [true, '이메일은 필수입니다.'],
+      required: [true, '이메일을 입력해주세요.'],
       unique: true,
       lowercase: true,
-      match: [
-        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-        '유효한 이메일 주소를 입력해주세요.',
-      ],
     },
     password: {
       type: String,
-      required: [true, '비밀번호는 필수입니다.'],
+      required: [true, '비밀번호를 입력해주세요.'],
       minlength: 6,
-      select: false, // 쿼리 결과에 비밀번호 필드가 포함되지 않도록 설정
     },
     profilePhoto: {
       type: String,
-      default: '',
+      default: null,
+    },
+    gender: {
+      type: String,
+      enum: ['남성', '여성', '기타'],
+      required: [true, '성별을 선택해주세요.'],
     },
     createdAt: {
       type: Date,

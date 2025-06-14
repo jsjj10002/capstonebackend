@@ -3,12 +3,12 @@ const router = express.Router();
 const {
   createDiary,
   getDiaries,
+  getDiariesByMonth,
   getDiaryById,
   updateDiary,
   deleteDiary,
   searchDiaries,
-  generateImagePromptFromDiary,
-  generateDiaryImageWithComfy,
+  getDiaryPromptLog,
 } = require('../controllers/diaryController');
 const { protect } = require('../middleware/authMiddleware');
 const { uploadLocal } = require('../config/uploadConfig');
@@ -22,17 +22,17 @@ router.post('/', uploadLocal.array('photos', 5), createDiary);
 // 내 모든 일기 조회 라우트
 router.get('/', getDiaries);
 
+// 월별 일기 조회 라우트
+router.get('/monthly', getDiariesByMonth);
+
 // 일기 검색 라우트 - 이 라우트는 /:id 라우트보다 앞에 위치해야 함
 router.get('/search', searchDiaries);
 
 // 특정 일기 조회 라우트
 router.get('/:id', getDiaryById);
 
-// 특정 일기의 이미지 생성 프롬프트 생성 라우트
-router.get('/:id/prompt', generateImagePromptFromDiary);
-
-// ComfyUI를 사용하여 일기 이미지 생성 라우트
-router.post('/:id/generate-image', generateDiaryImageWithComfy);
+// 특정 일기의 프롬프트 로그 조회
+router.get('/:id/prompt-log', getDiaryPromptLog);
 
 // 일기 수정 라우트
 router.put('/:id', uploadLocal.array('photos', 5), updateDiary);

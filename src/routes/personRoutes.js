@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const {
-  createPerson,
-  getPeople,
+  addPerson,
+  getMyPeople,
   getPersonById,
   updatePerson,
   deletePerson,
@@ -15,10 +15,10 @@ const { uploadLocal } = require('../config/uploadConfig');
 router.use(protect);
 
 // 새 사람 추가 라우트
-router.post('/', uploadLocal.single('photo'), createPerson);
+router.post('/', uploadLocal.single('photo'), addPerson);
 
 // 내가 추가한 모든 사람 조회 라우트
-router.get('/', getPeople);
+router.get('/', getMyPeople);
 
 // 사람 검색 라우트
 router.get('/search', searchPeople);

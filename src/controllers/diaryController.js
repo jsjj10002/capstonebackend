@@ -1,58 +1,264 @@
 const Diary = require('../models/diaryModel');
 const User = require('../models/userModel');
+const Person = require('../models/personModel');
+const { getArtStyleById, getDefaultArtStyle } = require('../utils/artStyleManager');
 const { uploadToS3 } = require('../config/uploadConfig');
 const { analyzeDiaryContent, generateImagePrompt } = require('../config/openaiConfig');
-const { customizeWorkflow, runComfyWorkflow } = require('../config/comfyuiConfig');
+const { customizeWorkflow, runComfyWorkflow, runOriginalWorkflow } = require('../config/comfyuiConfig');
 const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
 
-// 새 일기 작성
+// 한국어 조사 제거 함수 
+const removeKoreanParticles = (name) => {
+  if (!name || typeof name !== 'string') {
+    return name;
+  }
+  
+  // 한국어 조사 목록 (길이순으로 정렬)
+  const particles = [
+    '에게서', '으로부터', '로부터', '에서부터',  // 3-4글자 조사
+    '에게', '한테', '으로', '에서', '부터', '까지', '마저', '조차', // 2글자 조사  
+    '과', '와', '을', '를', '이', '가', '은', '는', '만', '도', '로'  // 1글자 조사
+  ];
+  
+  let cleanName = name.trim();
+  
+  // 조사 제거 (가장 긴 조사부터 확인)
+  for (const particle of particles) {
+    if (cleanName.endsWith(particle)) {
+      cleanName = cleanName.slice(0, -particle.length);
+      break; // 하나의 조사만 제거
+    }
+  }
+  
+  return cleanName.trim();
+};
+
+// 새 일기 작성 (자동 이미지 생성 포함)
 const createDiary = async (req, res) => {
   try {
-    const { title, content, mood, tags } = req.body;
+    const { content, diaryDate, artStyleId } = req.body;
     
-    // 기본 일기 데이터 구성
+    if (!content || content.trim() === '') {
+      return res.status(400).json({ message: '일기 내용을 입력해주세요.' });
+    }
+    
+    if (!artStyleId) {
+      return res.status(400).json({ message: '화풍을 선택해주세요.' });
+    }
+    
+    // @태그 추출 (조사 전처리는 스키마 미들웨어에서 처리)
+    const atMentions = content.match(/@[^\s]+/g);
+    let mainCharacterData = {};
+    
+    if (atMentions && atMentions.length > 0) {
+      const mainCharacterName = atMentions[0].substring(1);
+      const cleanName = removeKoreanParticles(mainCharacterName); // 조사 제거
+      
+      const existingPerson = await Person.findOne({
+        user: req.user._id,
+        name: cleanName
+      });
+      
+      if (existingPerson) {
+        mainCharacterData = {
+          personId: existingPerson._id,
+          name: existingPerson.name,
+          isFromContacts: true
+        };
+      } else {
+        // 연락처에 없는 경우 - 주인공 정보가 필요
+        const mainCharacterInfo = req.body.mainCharacter;
+        if (!mainCharacterInfo || !mainCharacterInfo.gender || !mainCharacterInfo.hairStyle || !mainCharacterInfo.clothing) {
+          return res.status(400).json({ 
+            message: '새로운 주인공이 지정되었습니다. 성별, 헤어스타일, 의상 정보를 입력해주세요.',
+            requiresCharacterInfo: true,
+            mainCharacterName: mainCharacterName
+          });
+        }
+        
+        // 주인공 사진이 필요
+        if (!req.files || req.files.length === 0) {
+          return res.status(400).json({ 
+            message: '새로운 주인공의 사진을 업로드해주세요.',
+            requiresPhoto: true,
+            mainCharacterName: mainCharacterName
+          });
+        }
+        
+        // 새 사람을 연락처에 자동 추가
+        try {
+          const newPerson = await Person.create({
+            name: mainCharacterName,
+            gender: mainCharacterInfo.gender,
+            hairStyle: mainCharacterInfo.hairStyle,
+            clothing: mainCharacterInfo.clothing,
+            accessories: mainCharacterInfo.accessories || '',
+            photo: `/uploads/${req.files[0].filename}`,
+            user: req.user._id,
+          });
+          
+          mainCharacterData = {
+            personId: newPerson._id,
+            name: newPerson.name,
+            isFromContacts: true
+          };
+        } catch (error) {
+          console.error('주인공 자동 추가 오류:', error);
+          return res.status(500).json({ message: '주인공 정보 저장에 실패했습니다.' });
+        }
+      }
+    
+    
+    // 화풍 정보 가져오기
+    }
+    
+    const artStyle = getArtStyleById(artStyleId);
+    if (!artStyle) {
+      return res.status(400).json({ message: '유효하지 않은 화풍입니다.' });
+    }
+    
+    // 단순화된 일기 데이터
     const diaryData = {
-      user: req.user._id,
-      title,
+      userId: req.user._id,
       content,
-      mood: mood || '기타',
-      tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim())) : [],
+      diaryDate: diaryDate ? new Date(diaryDate) : new Date(),
       photos: [],
+      artStyleId: artStyle.id,
+      mainCharacter: mainCharacterData
     };
     
-    // 업로드된 사진이 있는 경우 처리
-    if (req.files && req.files.length > 0) {
-      // 사진 URL 추가
-      diaryData.photos = req.files.map(file => `/uploads/${file.filename}`);
-    }
+    // 사진 처리...
     
-    // 태그와 무드 자동 분석 (입력값이 없는 경우)
-    if (!tags || tags.length === 0 || !mood || mood === '기타') {
-      try {
-        const analysis = await analyzeDiaryContent(title, content);
-        
-        if (!tags || tags.length === 0) {
-          diaryData.tags = analysis.tags;
-        }
-        
-        if (!mood || mood === '기타') {
-          diaryData.mood = analysis.mood;
-        }
-      } catch (error) {
-        console.error('일기 내용 분석 오류:', error);
-        // 분석 실패 시에도 일기는 저장 진행
-      }
-    }
+    // AI 분석 부분 완전 제거 (태그, 무드 분석 없음)
     
-    // 일기 생성
     const diary = await Diary.create(diaryData);
     
-    res.status(201).json(diary);
+    // 이미지 생성
+    try {
+      const imageResult = await generateImageForDiary(diary, req.user, artStyle);
+      
+      if (imageResult.success) {
+        diary.generatedImage = imageResult.photoUrl;
+        diary.imagePrompt = imageResult.prompt;
+        diary.promptLog = imageResult.promptLog;
+        await diary.save();
+      }
+    } catch (error) {
+      console.error('이미지 자동 생성 오류:', error);
+    }
+    
+    const populatedDiary = await Diary.findById(diary._id)
+      .populate('mainCharacter.personId', 'name photo gender hairStyle clothing accessories');
+    
+    res.status(201).json({
+      message: '일기가 작성되었습니다.',
+      diary: populatedDiary,
+      imageGenerated: !!diary.generatedImage
+    });
   } catch (error) {
     console.error('일기 작성 오류:', error);
     res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+};
+
+// 일기용 이미지 생성 함수 (내부 사용)
+const generateImageForDiary = async (diary, user, artStyle) => {
+  try {
+    let characterPhoto = null;
+    let characterDescription = '';
+    
+    // 주인공이 있는 경우
+    if (diary.mainCharacter && diary.mainCharacter.name && diary.mainCharacter.personId) {
+      const person = await Person.findById(diary.mainCharacter.personId);
+      if (person && person.photo) {
+        characterPhoto = path.join(__dirname, '..', '..', person.photo);
+        
+        // 단순한 특징 문자열 생성
+        const characteristics = [];
+        
+        // 성별
+        const genderMap = { '남성': '1man', '여성': '1woman', '기타': '1person' };
+        characteristics.push(genderMap[person.gender] || '1person');
+        
+        // 헤어스타일
+        if (person.hairStyle) {
+          characteristics.push(person.hairStyle);
+        }
+        
+        // 의상
+        if (person.clothing) {
+          characteristics.push(person.clothing);
+        }
+        
+        // 액세서리
+        if (person.accessories) {
+          characteristics.push(person.accessories);
+        }
+        
+        characterDescription = characteristics.join(', ');
+      }
+    } 
+    // 주인공이 없으면 사용자 자신
+    else {
+      if (user.profilePhoto) {
+        characterPhoto = path.join(__dirname, '..', '..', user.profilePhoto);
+      }
+      
+      // 사용자 성별 기반 기본 설명
+      const genderMap = { '남성': '1man', '여성': '1woman', '기타': '1person' };
+      characterDescription = genderMap[user.gender] || '1person';
+    }
+    
+    if (!characterPhoto || !fs.existsSync(characterPhoto)) {
+      throw new Error('캐릭터 사진을 찾을 수 없습니다.');
+    }
+    
+    // 단순화된 프롬프트 생성 (일기 내용 + 캐릭터 설명만)
+    const finalPrompt = await generateImagePrompt(diary.content, characterDescription);
+    
+    // 단순화된 프롬프트 로그
+    const promptLog = {
+      finalPrompt,
+      characterDescription,
+      createdAt: new Date()
+    };
+    
+    console.log('=== 프롬프트 생성 로그 ===');
+    console.log('캐릭터 설명:', characterDescription);
+    console.log('최종 프롬프트:', finalPrompt);
+    console.log('=======================');
+    
+    // 워크플로우 실행
+    const workflowPath = path.join(__dirname, '..', '..', artStyle.workflowFile);
+    const imageName = characterPhoto ? path.basename(characterPhoto) : null;
+    
+    const comfyResponse = await runOriginalWorkflow(workflowPath, finalPrompt, imageName);
+    
+    if (!comfyResponse.success) {
+      throw new Error(comfyResponse.error || '이미지 생성 실패');
+    }
+    
+    // 이미지 저장
+    const uploadDir = path.join(__dirname, '..', '..', 'uploads');
+    const filename = `diary_${diary._id}_${Date.now()}.png`;
+    const imagePath = path.join(uploadDir, filename);
+    
+    fs.writeFileSync(imagePath, comfyResponse.imageData);
+    
+    return {
+      success: true,
+      photoUrl: `/uploads/${filename}`,
+      prompt: finalPrompt,
+      promptLog
+    };
+  } catch (error) {
+    console.error('이미지 생성 오류:', error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 };
 
@@ -62,14 +268,15 @@ const getDiaries = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     
-    // 사용자의 모든 일기 조회 (최신순)
-    const diaries = await Diary.find({ user: req.user._id })
-      .sort({ createdAt: -1 })
+    // 사용자의 모든 일기 조회 (일기 날짜 기준 최신순)
+    const diaries = await Diary.find({ userId: req.user._id })
+      .populate('mainCharacter.personId', 'name photo')
+      .sort({ diaryDate: -1 })
       .skip(skip)
       .limit(Number(limit));
     
     // 전체 일기 수
-    const total = await Diary.countDocuments({ user: req.user._id });
+    const total = await Diary.countDocuments({ userId: req.user._id });
     
     res.json({
       diaries,
@@ -83,21 +290,67 @@ const getDiaries = async (req, res) => {
   }
 };
 
+// 월별 일기 조회
+const getDiariesByMonth = async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    
+    if (!year || !month) {
+      return res.status(400).json({ message: '년도와 월을 입력해주세요.' });
+    }
+    
+    // 해당 월의 시작일과 끝일 계산
+    const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59, 999);
+    
+    // 해당 월의 일기들 조회
+    const diaries = await Diary.find({
+      userId: req.user._id,
+      diaryDate: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    })
+    .sort({ diaryDate: -1 })
+    .select('_id diaryDate photos generatedImage content');
+    
+    // 요청된 형식으로 데이터 변환
+    const monthlyDiaries = diaries.map(diary => ({
+      date: diary.diaryDate.toISOString().split('T')[0], // YYYY-MM-DD 형식
+      id: diary._id,
+      thumbnail: diary.generatedImage || (diary.photos && diary.photos.length > 0 ? diary.photos[0] : null),
+      content: diary.content.substring(0, 100) + '...' // 내용 미리보기
+    }));
+    
+    res.json(monthlyDiaries);
+  } catch (error) {
+    console.error('월별 일기 조회 오류:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+};
+
 // 특정 일기 조회
 const getDiaryById = async (req, res) => {
   try {
-    const diary = await Diary.findById(req.params.id);
+    const diary = await Diary.findById(req.params.id)
+      .populate('mainCharacter.personId', 'name photo gender hairStyle clothing accessories');
     
     if (!diary) {
       return res.status(404).json({ message: '일기를 찾을 수 없습니다.' });
     }
     
     // 본인 일기만 조회 가능
-    if (diary.user.toString() !== req.user._id.toString()) {
+    if (diary.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: '권한이 없습니다.' });
     }
     
-    res.json(diary);
+    // 화풍 정보 추가
+    const artStyle = getArtStyleById(diary.artStyleId);
+    
+    res.json({
+      ...diary.toObject(),
+      artStyle
+    });
   } catch (error) {
     console.error('일기 조회 오류:', error);
     res.status(500).json({ message: '서버 오류가 발생했습니다.' });
@@ -107,7 +360,7 @@ const getDiaryById = async (req, res) => {
 // 일기 수정
 const updateDiary = async (req, res) => {
   try {
-    const { title, content, mood, tags } = req.body;
+    const { content } = req.body;
     const diary = await Diary.findById(req.params.id);
     
     if (!diary) {
@@ -115,58 +368,63 @@ const updateDiary = async (req, res) => {
     }
     
     // 본인 일기만 수정 가능
-    if (diary.user.toString() !== req.user._id.toString()) {
+    if (diary.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: '권한이 없습니다.' });
     }
     
     // 업데이트할 데이터
     const updateData = {
-      title: title || diary.title,
       content: content || diary.content,
-      mood: mood || diary.mood,
-      tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim())) : diary.tags,
     };
     
-    // 태그와 무드 자동 분석 (입력값이 없는 경우)
-    if ((!tags || tags.length === 0) || (!mood || mood === '기타')) {
-      try {
-        const analysis = await analyzeDiaryContent(
-          updateData.title,
-          updateData.content
-        );
+    // 내용이 변경된 경우 주인공 재추출 및 AI 재분석
+    if (content && content !== diary.content) {
+      const atMentions = content.match(/@[^\s]+/g);
+      if (atMentions && atMentions.length > 0) {
+        const mainCharacterName = atMentions[0].substring(1);
         
-        if (!tags || tags.length === 0) {
-          updateData.tags = analysis.tags;
+        // 기존 주인공과 다른 경우에만 업데이트
+        if (mainCharacterName !== diary.mainCharacter?.name) {
+          const person = await Person.findOne({
+            user: req.user._id,
+            name: mainCharacterName
+          });
+          
+          if (person) {
+            updateData.mainCharacter = {
+              personId: person._id,
+              name: person.name,
+              isFromContacts: true
+            };
+          } else {
+            updateData.mainCharacter = {
+              name: mainCharacterName,
+              isFromContacts: false
+            };
+          }
         }
-        
-        if (!mood || mood === '기타') {
-          updateData.mood = analysis.mood;
-        }
-      } catch (error) {
-        console.error('일기 내용 분석 오류:', error);
-        // 분석 실패 시에도 일기는 저장 진행
+      } else {
+        // @태그가 없으면 주인공 정보 초기화
+        updateData.mainCharacter = {};
       }
+      
+      
     }
     
     // 새 사진이 업로드된 경우
     if (req.files && req.files.length > 0) {
-      // 기존 사진 배열 복제
       const photos = [...diary.photos];
-      
-      // 새 사진 추가
       req.files.forEach(file => {
         photos.push(`/uploads/${file.filename}`);
       });
-      
       updateData.photos = photos;
     }
     
-    // 일기 업데이트
     const updatedDiary = await Diary.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true }
-    );
+    ).populate('mainCharacter.personId', 'name photo gender hairStyle clothing accessories');
     
     res.json(updatedDiary);
   } catch (error) {
@@ -185,7 +443,7 @@ const deleteDiary = async (req, res) => {
     }
     
     // 본인 일기만 삭제 가능
-    if (diary.user.toString() !== req.user._id.toString()) {
+    if (diary.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: '권한이 없습니다.' });
     }
     
@@ -206,16 +464,17 @@ const searchDiaries = async (req, res) => {
       return res.status(400).json({ message: '검색어를 입력해주세요.' });
     }
     
-    // 제목, 내용, 태그로 검색
+    // 내용과 태그로 검색 (title 제거)
     const diaries = await Diary.find({
-      user: req.user._id,
+      userId: req.user._id,
       $or: [
-        { title: { $regex: keyword, $options: 'i' } },
         { content: { $regex: keyword, $options: 'i' } },
         { tags: { $in: [new RegExp(keyword, 'i')] } },
         { mood: { $regex: keyword, $options: 'i' } }
       ],
-    }).sort({ createdAt: -1 });
+    })
+    .populate('mainCharacter.personId', 'name photo')
+    .sort({ diaryDate: -1 });
     
     res.json(diaries);
   } catch (error) {
@@ -224,200 +483,33 @@ const searchDiaries = async (req, res) => {
   }
 };
 
-// 일기 내용 기반 이미지 생성 프롬프트 생성
-const generateImagePromptFromDiary = async (req, res) => {
+// 일기의 프롬프트 로그 조회
+const getDiaryPromptLog = async (req, res) => {
   try {
-    const diaryId = req.params.id;
-    const diary = await Diary.findById(diaryId);
+    const diary = await Diary.findById(req.params.id)
+      .select('promptLog artStyleId');
     
     if (!diary) {
       return res.status(404).json({ message: '일기를 찾을 수 없습니다.' });
     }
     
-    // 본인 일기만 접근 가능
-    if (diary.user.toString() !== req.user._id.toString()) {
+    // 본인 일기만 조회 가능
+    if (diary.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: '권한이 없습니다.' });
     }
     
-    // 이미지 생성 프롬프트 생성
-    const prompt = await generateImagePrompt(
-      diary.title,
-      diary.content,
-      diary.tags,
-      diary.mood
-    );
+    const artStyle = getArtStyleById(diary.artStyleId);
     
-    // 세션에 프롬프트 저장 (Redis 등을 사용하는 것이 더 좋습니다만, 예시로 세션 사용)
-    req.session = req.session || {};
-    req.session[`prompt_${diaryId}`] = prompt;
-    
-    console.log(`프롬프트 생성 및 저장 완료. 일기 ID: ${diaryId}, 길이: ${prompt.length}자`);
-    console.log(`프롬프트 내용 미리보기: ${prompt.substring(0, 100)}...`);
-    
-    res.json({ prompt });
-  } catch (error) {
-    console.error('이미지 프롬프트 생성 오류:', error);
-    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
-  }
-};
-
-// ComfyUI를 활용한 이미지 생성
-const generateDiaryImageWithComfy = async (req, res) => {
-  try {
-    const diaryId = req.params.id;
-    
-    // 일기 데이터 조회
-    const diary = await Diary.findById(diaryId);
-    if (!diary) {
-      return res.status(404).json({ message: '일기를 찾을 수 없습니다.' });
-    }
-    
-    // 권한 확인 (일기 작성자만 접근 가능)
-    if (diary.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: '권한이 없습니다.' });
-    }
-    
-    // 사용자 조회 및 프로필 이미지 경로 가져오기
-    const user = await User.findById(req.user._id);
-    if (!user || !user.profilePhoto) {
-      return res.status(400).json({ message: '프로필 사진이 필요합니다.' });
-    }
-    
-    const profilePhoto = user.profilePhoto;
-    const profilePhotoPath = path.join(__dirname, '..', '..', profilePhoto);
-    
-    // 프로필 사진 파일 존재 확인
-    if (!fs.existsSync(profilePhotoPath)) {
-      return res.status(400).json({ message: '프로필 사진 파일을 찾을 수 없습니다.' });
-    }
-    
-    // 이전에 생성된 프롬프트 가져오기
-    let prompt;
-    
-    // 클라이언트에서 프롬프트를 바로 전달받은 경우
-    if (req.body && req.body.prompt) {
-      prompt = req.body.prompt;
-      console.log('클라이언트에서 직접 전달받은 프롬프트 사용');
-    } 
-    // 세션에 저장된 프롬프트 확인
-    else if (req.session && req.session[`prompt_${diaryId}`]) {
-      prompt = req.session[`prompt_${diaryId}`];
-      console.log('세션에 저장된 프롬프트 사용');
-    } 
-    // 프롬프트가 없는 경우 새로 생성
-    else {
-      console.log('저장된 프롬프트 없음, 새로 생성합니다');
-      prompt = await generateImagePrompt(
-        diary.title,
-        diary.content,
-        diary.tags,
-        diary.mood
-      );
-    }
-    
-    // 프롬프트 유효성 확인
-    if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
-      console.error('유효하지 않은 프롬프트:', prompt);
-      return res.status(500).json({ message: '이미지 프롬프트 생성에 실패했습니다' });
-    }
-    
-    console.log('최종 사용 프롬프트:', prompt.substring(0, 100) + '...');
-    
-    // ComfyUI 워크플로우 로드
-    const workflowPath = path.join(__dirname, '..', '..', 'comfytest.json');
-    if (!fs.existsSync(workflowPath)) {
-      console.error('ComfyUI 워크플로우 파일을 찾을 수 없음:', workflowPath);
-      return res.status(500).json({ message: 'ComfyUI 워크플로우 파일을 찾을 수 없습니다.' });
-    }
-    
-    console.log(`ComfyUI 워크플로우 파일 로드: ${workflowPath}`);
-    const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
-    
-    // 워크플로우 상태 확인
-    console.log('워크플로우 노드 ID 확인:');
-    console.log('노드 46 (LoadImage) 존재 여부:', !!workflow['46']);
-    console.log('노드 54 (CLIPTextEncode) 존재 여부:', !!workflow['54']);
-    console.log('노드 56 (CLIPTextEncode) 존재 여부:', !!workflow['56']);
-    console.log('노드 51 (SaveImage) 존재 여부:', !!workflow['51']);
-    
-    // 워크플로우 커스터마이징
-    console.log(`워크플로우 커스터마이징: 
-      - 프롬프트 길이: ${prompt.length} 자
-      - 이미지 경로: ${profilePhotoPath}
-      - 이미지 존재 여부: ${fs.existsSync(profilePhotoPath) ? '예' : '아니오'}`);
-      
-    const customizedWorkflow = customizeWorkflow(workflow, {
-      prompt: prompt,
-      imagePath: profilePhotoPath
-    });
-    
-    // 프롬프트가 노드에 제대로 설정되었는지 확인
-    if (customizedWorkflow['54']) {
-      console.log('노드 54 프롬프트 설정값:', customizedWorkflow['54'].inputs.text.substring(0, 50) + '...');
-    }
-    if (customizedWorkflow['56']) {
-      console.log('노드 56 프롬프트 설정값:', customizedWorkflow['56'].inputs.text.substring(0, 50) + '...');
-    }
-    
-    // SaveImage 노드 설정 확인
-    if (customizedWorkflow['51']) {
-      console.log('노드 51 (SaveImage) 설정:', JSON.stringify(customizedWorkflow['51'].inputs));
-    }
-    
-    // ComfyUI 서버 상태 확인
-    const COMFY_SERVER = req.app.locals.COMFY_SERVER_URL || 'http://127.0.0.1:8188';
-    try {
-      console.log(`ComfyUI 서버 연결 확인 시도: ${COMFY_SERVER}/system_stats`);
-      const serverCheckResponse = await fetch(`${COMFY_SERVER}/system_stats`);
-      if (serverCheckResponse.ok) {
-        const stats = await serverCheckResponse.json();
-        console.log('ComfyUI 서버 연결 확인 완료:', JSON.stringify(stats).substring(0, 100) + '...');
-      } else {
-        console.warn(`ComfyUI 서버 응답은 받았으나 상태가 좋지 않음: ${serverCheckResponse.status}`);
+    res.json({
+      promptLog: diary.promptLog,
+      artStyle: {
+        name: artStyle.name,
+        displayName: artStyle.displayName,
+        workflowFile: artStyle.workflowFile
       }
-    } catch (err) {
-      console.error('ComfyUI 서버 연결 확인 실패:', err);
-      return res.status(500).json({ 
-        message: 'ComfyUI 서버에 연결할 수 없습니다', 
-        error: err.message || '알 수 없는 연결 오류'
-      });
-    }
-    
-    // ComfyUI API 호출
-    console.log('ComfyUI API 호출 시작...');
-    const startTime = Date.now();
-    const comfyResponse = await runComfyWorkflow(customizedWorkflow);
-    console.log(`ComfyUI API 호출 완료: ${(Date.now() - startTime) / 1000}초 소요`);
-    console.log('ComfyUI 응답 상태:', comfyResponse.success ? '성공' : '실패');
-    
-    if (!comfyResponse.success) {
-      return res.status(500).json({ 
-        message: '이미지 생성에 실패했습니다.', 
-        error: comfyResponse.error 
-      });
-    }
-    
-    // 생성된 이미지 저장
-    const uploadDir = path.join(__dirname, '..', '..', 'uploads');
-    const filename = `diary_${diaryId}_${Date.now()}.png`;
-    const imagePath = path.join(uploadDir, filename);
-    
-    fs.writeFileSync(imagePath, comfyResponse.imageData);
-    
-    // 일기에 생성된 이미지 추가
-    const photoUrl = `/uploads/${filename}`;
-    diary.photos.push(photoUrl);
-    await diary.save();
-    
-    // 응답
-    res.status(201).json({
-      message: '이미지가 성공적으로 생성되었습니다.',
-      photo: photoUrl,
-      diary
     });
-    
   } catch (error) {
-    console.error('이미지 생성 오류:', error);
+    console.error('프롬프트 로그 조회 오류:', error);
     res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
 };
@@ -425,10 +517,10 @@ const generateDiaryImageWithComfy = async (req, res) => {
 module.exports = {
   createDiary,
   getDiaries,
+  getDiariesByMonth,
   getDiaryById,
   updateDiary,
   deleteDiary,
   searchDiaries,
-  generateImagePromptFromDiary,
-  generateDiaryImageWithComfy,
+  getDiaryPromptLog,
 }; 
