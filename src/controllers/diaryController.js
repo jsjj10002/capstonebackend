@@ -178,9 +178,10 @@ const generateImageForDiary = async (diary, user, artStyle) => {
         // 단순한 특징 문자열 생성
         const characteristics = [];
         
-        // 성별
-        const genderMap = { '남성': '1man', '여성': '1woman', '기타': '1person' };
-        characteristics.push(genderMap[person.gender] || '1person');
+        // 성별 (한국어 그대로 전달)
+        if (person.gender) {
+          characteristics.push(person.gender); // '남성', '여성', '기타' 그대로
+        }
         
         // 헤어스타일
         if (person.hairStyle) {
@@ -215,17 +216,25 @@ const generateImageForDiary = async (diary, user, artStyle) => {
       throw new Error('캐릭터 사진을 찾을 수 없습니다.');
     }
     
-    // 단순화된 프롬프트 생성 (일기 내용 + 캐릭터 설명만)
-    const finalPrompt = await generateImagePrompt(diary.content, characterDescription);
+    // 화풍별 필수 키워드 추출
+    const requiredKeywords = artStyle.requiredKeywords || [];
     
-    // 단순화된 프롬프트 로그
+    // 프롬프트 생성 (필수 키워드 포함)
+    const finalPrompt = await generateImagePrompt(diary.content, characterDescription, requiredKeywords);
+    
+    // 프롬프트 로그에 필수 키워드 정보 추가
     const promptLog = {
       finalPrompt,
       characterDescription,
+      requiredKeywords: requiredKeywords,
+      artStyleId: artStyle.id,
       createdAt: new Date()
     };
     
+    
     console.log('=== 프롬프트 생성 로그 ===');
+    console.log('화풍:', artStyle.name);
+    console.log('필수 키워드:', requiredKeywords);
     console.log('캐릭터 설명:', characterDescription);
     console.log('최종 프롬프트:', finalPrompt);
     console.log('=======================');

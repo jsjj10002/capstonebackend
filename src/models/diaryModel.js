@@ -41,6 +41,8 @@ const diarySchema = new mongoose.Schema({
   promptLog: {
     finalPrompt: String,
     characterDescription: String,
+    requiredKeywords: [String], // 화풍별 필수 키워드 배열 추가
+    artStyleId: String, // 화풍 ID 추가
     createdAt: { type: Date, default: Date.now },
   },
   userId: {
