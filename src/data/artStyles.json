@@ -21,7 +21,7 @@
       "description": "신카이 마코토 스타일의 아름답고 감성적인 화풍",
       "workflowFile": "Makoto Shinkai workflow.json",
       "checkpointName": "anyloraCheckpoint_bakedvaeBlessedFp16.safetensors",
-      "requiredKeywords": ["masterpiece", "best quality", "shinkai makoto", "cinematic composition", "dramatic lighting", "atmospheric perspective", "beautiful sky"],
+      "requiredKeywords": ["shinkai makoto", "kimi no na wa.", "tenki no ko", "kotonoha no niwa"],
       "negativePrompt": "embedding:badhandv4, embedding:easynegative, (painting by bad-artist-anime:0.9), (painting by bad-artist:0.9), watermark, text, error, blurry, jpeg artifacts, cropped, worst quality, low quality, normal quality",
       "loraFile": "Makoto Shinkai.safetensors",
       "loraStrength": 1.0,
