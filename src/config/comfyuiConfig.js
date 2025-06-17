@@ -335,9 +335,9 @@ const runComfyWorkflow = async (workflow) => {
           
           if (Object.keys(historyData).length === 0) {
             console.log(`${waitTime/1000}초 경과: prompt_id=${result.prompt_id}에 대한 히스토리 데이터가 없습니다.`);
-            continue;
-          }
-          
+          continue;
+        }
+        
           const promptData = historyData[result.prompt_id];
           if (promptData && promptData.status && promptData.status.completed) {
             if (!executionTime) {
@@ -369,8 +369,8 @@ const runComfyWorkflow = async (workflow) => {
                   
                   if (imageCheckResponse.ok) {
                     imageFound = true;
-                    break;
-                  }
+              break;
+            } 
                 }
               }
               
