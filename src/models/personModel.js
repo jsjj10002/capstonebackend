@@ -11,6 +11,7 @@ const personSchema = new mongoose.Schema(
       type: String,
       required: [true, '이름은 필수입니다.'],
       trim: true,
+      maxlength: [50, '이름은 50자를 초과할 수 없습니다.'],
     },
     gender: {
       type: String,
@@ -20,6 +21,35 @@ const personSchema = new mongoose.Schema(
     photo: {
       type: String, // 사진 URL
       required: [true, '사진은 필수입니다.'],
+    },
+    tags: {
+      type: [String], // 태그 배열 (다중값 지원)
+      default: [],
+      validate: {
+        validator: function(tags) {
+          // 태그 개수 제한 (최대 20개)
+          if (tags.length > 20) return false;
+          // 각 태그 길이 제한 (최대 30자)
+          return tags.every(tag => tag.length <= 30);
+        },
+        message: '태그는 최대 20개까지, 각 태그는 30자를 초과할 수 없습니다.'
+      }
+    },
+    // 컨트롤러에서 사용하는 필드들 추가
+    hairStyle: {
+      type: String,
+      default: '',
+      maxlength: [100, '헤어스타일 설명은 100자를 초과할 수 없습니다.'],
+    },
+    clothing: {
+      type: String,
+      default: '',
+      maxlength: [100, '의상 설명은 100자를 초과할 수 없습니다.'],
+    },
+    accessories: {
+      type: String,
+      default: '',
+      maxlength: [100, '액세서리 설명은 100자를 초과할 수 없습니다.'],
     },
     createdAt: {
       type: Date,

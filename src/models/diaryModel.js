@@ -16,6 +16,10 @@ const diarySchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  identifiedPerson: {
+    type: String,
+    default: null,
+  },
   imagePrompt: {
     type: String,
   },

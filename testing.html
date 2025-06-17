@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>일기 앱 백엔드 API 테스트 (v2.0)</title>
+  <title>일기 앱 백엔드 API 테스트 (v3.0)</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -179,12 +179,25 @@
       border-color: #f5c6cb;
       color: #721c24;
     }
+
+    .v3-highlight {
+      background-color: #e8f5e8;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+      border: 1px solid #c3e6cb;
+    }
+
+    .v3-highlight h4 {
+      margin-top: 0;
+      color: #155724;
+    }
   </style>
 </head>
 <body>
   <div class="header">
     <h1>일기 앱 백엔드 API 테스트</h1>
-    <p>v2.1 - Gemini 2.5 Flash & 두 단계 AI 프로세스 지원</p>
+    <p>v3.0 - JSON 기반 장면 묘사 & 스마트 태그 시스템</p>
     <div id="connectionStatus">
       <span class="status-indicator status-unknown"></span>
       서버 연결 상태: 확인 중...
@@ -470,7 +483,7 @@
     </div>
 
     <div id="diarySection" class="tabcontent">
-      <!-- 화풍 목록 조회 (v2.1 NEW) -->
+      <!-- 화풍 목록 조회 -->
       <div class="section">
         <div class="section-header">
           <h3>🎨 화풍 목록 조회</h3>
@@ -483,56 +496,100 @@
         </div>
       </div>
 
-      <!-- 장면 묘사 생성 (v2.1 NEW) -->
+      <!-- 장면 묘사 생성 (v3.0 업데이트) -->
       <div class="section">
         <div class="section-header">
-          <h3>🖼️ 장면 묘사 생성</h3>
+          <h3>🖼️ 장면 묘사 생성 (v3.0)</h3>
           <code>POST /api/diaries/generate-scene</code>
         </div>
         <div class="section-content">
+          <div class="v3-highlight">
+            <h4>v3.0 테스트용 장면 묘사 생성</h4>
+            <p><strong>안내:</strong> 일반적으로는 아래 "일기 작성" 섹션에서 통합 워크플로우를 사용하세요. 이 섹션은 장면 묘사 기능만 별도로 테스트할 때 사용합니다.</p>
+            <ul>
+              <li><strong>JSON 구조화된 응답:</strong> {TEXT: "장면묘사", PERSON: "주인공이름"}</li>
+              <li><strong>스마트 태그 시스템:</strong> @태그 자동 인식 및 처리</li>
+              <li><strong>간소화된 입력:</strong> 일기 내용만으로 모든 정보 추출</li>
+            </ul>
+          </div>
           <div class="form-grid">
             <div>
               <div class="form-group">
-                <label for="sceneContent">일기 내용 <span class="required">*</span></label>
-                <textarea id="sceneContent" rows="4" placeholder="@김철수와 카페에서 만났다. 오늘 날씨가 정말 좋았다."></textarea>
-              </div>
-              <div class="form-group">
-                <label for="sceneProtagonist">주인공 이름</label>
-                <input type="text" id="sceneProtagonist" placeholder="김철수">
+                <label for="sceneContent">테스트용 일기 내용 (@태그 지원) <span class="required">*</span></label>
+                <textarea id="sceneContent" rows="4" placeholder="@김철수와 카페에서 만났다. 오늘 날씨가 정말 좋았다.&#10;@엄마와 함께 쇼핑을 갔다.&#10;친구들과 공원에서 놀았다."></textarea>
               </div>
             </div>
             <div>
-              <div class="form-group">
-                <label for="sceneHint">장면 방향 힌트 (선택)</label>
-                <input type="text" id="sceneHint" placeholder="따뜻한 오후의 카페">
+              <div style="background-color: #fff3cd; padding: 15px; border-radius: 6px; border: 1px solid #ffeaa7;">
+                <h4 style="margin-top: 0;">v3.0 변경사항</h4>
+                <ul style="margin-bottom: 0; padding-left: 20px;">
+                  <li>protagonistName, sceneDirectionHint 필드 제거</li>
+                  <li>@태그로 주인공 자동 식별</li>
+                  <li>JSON 응답으로 구조화된 데이터 제공</li>
+                </ul>
               </div>
-              <div style="background-color: #e8f5e8; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                <small><strong>Gemini 2.5 Flash:</strong> 일기 내용을 분석하여 시각적 장면 묘사를 생성합니다.</small>
               </div>
             </div>
-          </div>
-          <button id="generateSceneButton" onclick="generateSceneDescription()">장면 묘사 생성</button>
+          <button id="generateSceneButton" onclick="generateSceneDescription()">테스트용 JSON 장면 묘사 생성</button>
           <div id="sceneGenerationResult" class="result"></div>
         </div>
       </div>
 
-      <!-- 일기 작성 -->
+      <!-- 일기 작성 (v3.0 업데이트) -->
       <div class="section">
         <div class="section-header">
-          <h3>✍️ 일기 작성</h3>
+          <h3>✍️ 일기 작성 (v3.0)</h3>
           <code>POST /api/diaries</code>
         </div>
         <div class="section-content">
+          <div class="v3-highlight">
+            <h4>v3.0 정확한 6단계 워크플로우</h4>
+            <ol>
+              <li>일기 작성 (@태그 지원)</li>
+              <li>장면 묘사 생성 (JSON 응답, @태그 기반)</li>
+              <li><strong>주요 인물 선택</strong> (기존 인물 목록에서 사용자가 직접 선택)</li>
+              <li>주요 인물 외형 작성 (선택된 인물의 성별 정보 자동 사용)</li>
+              <li>프롬프트 생성 (장면 묘사 100% 활용)</li>
+              <li>이미지 생성</li>
+            </ol>
+          </div>
+          <div class="v3-highlight">
+            <h4>v3.0 통합 워크플로우</h4>
+            <p><strong>단계:</strong> 1) 일기 작성 → 2) 장면 묘사 생성 → 3) 주요 인물 선택 → 4) 외모 키워드 입력 → 5) 이미지 생성</p>
+          </div>
+          
           <div class="form-grid">
             <div>
               <div class="form-group">
-                <label for="diaryContent">일기 내용 <span class="required">*</span></label>
-                <textarea id="diaryContent" rows="6" placeholder="일기 내용을 입력하세요. (@이름 형식으로 주인공 지정 가능)"></textarea>
+                <label for="diaryContent">1단계: 일기 내용 (@태그 지원) <span class="required">*</span></label>
+                <textarea id="diaryContent" rows="4" placeholder="@친구와 카페에서 커피를 마셨다. 정말 즐거운 시간이었다.&#10;&#10;@태그는 장면 묘사 생성을 위한 힌트입니다."></textarea>
+                <button type="button" onclick="generateSceneFromDiary()" style="margin-top: 5px; padding: 8px 12px; font-size: 12px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">2단계: 장면 묘사 자동 생성</button>
               </div>
+              
+              <div class="form-group">
+                <label for="sceneDescription">2단계: 장면 묘사 (자동 생성됨)</label>
+                <textarea id="sceneDescription" rows="3" placeholder="위의 '장면 묘사 자동 생성' 버튼을 눌러 생성하세요" readonly style="background-color: #f8f9fa;"></textarea>
+              </div>
+              
+              <div class="form-group">
+                <label for="selectedMainCharacter">3단계: 주요 인물 선택 <span class="required">*</span></label>
+                <select id="selectedMainCharacter">
+                  <option value="">인물을 선택하세요</option>
+                </select>
+                <button type="button" onclick="loadMyPeopleForSelectionWithFeedback()" style="margin-top: 5px; padding: 5px 10px; font-size: 12px;">인물 목록 새로고침</button>
+              </div>
+              
+              <div class="form-group">
+                <label for="userAppearanceKeywords">4단계: 사용자 외모 키워드 <span class="required">*</span></label>
+                <input type="text" id="userAppearanceKeywords" placeholder="예: long hair, casual clothing, glasses (성별 제외)">
+              </div>
+            </div>
+            <div>
               <div class="form-group">
                 <label for="diaryDate">일기 날짜</label>
                 <input type="date" id="diaryDate">
               </div>
+              
               <div class="form-group">
                 <label for="diaryArtStyle">화풍 선택 <span class="required">*</span></label>
                 <select id="diaryArtStyle">
@@ -548,42 +605,24 @@
                 </select>
                 <button type="button" onclick="loadArtStyles()" style="margin-top: 5px; padding: 5px 10px; font-size: 12px;">화풍 목록 새로고침</button>
               </div>
-            </div>
-            <div>
+              
               <div class="form-group">
                 <label for="diaryPhotos">사진 (최대 5개)</label>
                 <input type="file" id="diaryPhotos" accept="image/*" multiple>
               </div>
               
-                              <div style="background-color: #e8f5e8; padding: 15px; border-radius: 6px; margin-top: 15px; border: 1px solid #c3e6cb;">
-                <h4 style="margin-top: 0;">v2.1 두 단계 프로세스</h4>
-                <div class="form-group">
-                  <label for="sceneDescription">장면 묘사 (선택)</label>
-                  <textarea id="sceneDescription" rows="3" placeholder="미리 생성된 장면 묘사를 입력하거나 비워두면 자동 생성됩니다"></textarea>
+              <div style="background-color: #e3f2fd; padding: 15px; border-radius: 5px; margin-top: 10px; border: 1px solid #90caf9;">
+                <h4 style="margin-top: 0; color: #1976d2;">v3.0 워크플로우 안내</h4>
+                <ol style="margin-bottom: 0; padding-left: 20px;">
+                  <li>일기 내용에 @태그 포함하여 작성</li>
+                  <li>"장면 묘사 자동 생성" 버튼 클릭</li>
+                  <li>기존 인물 목록에서 주요 인물 선택</li>
+                  <li>외모 키워드 입력 후 일기 작성 완료</li>
+                </ol>
                 </div>
-                <div class="form-group">
-                  <label for="userAppearanceKeywords">사용자 외모 키워드 <span class="required">*</span></label>
-                  <input type="text" id="userAppearanceKeywords" placeholder="예: long hair, casual clothing, glasses (성별 제외)">
                 </div>
-                <div class="form-group">
-                  <label for="mainCharacterGender">새로운 인물 성별 (연락처에 없는 @태그 인물용)</label>
-                  <select id="mainCharacterGender">
-                    <option value="">선택해주세요</option>
-                    <option value="남성">남성</option>
-                    <option value="여성">여성</option>
-                    <option value="기타">기타</option>
-                  </select>
                 </div>
-                <div style="background-color: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                  <small><strong>새로운 프로세스:</strong> 1) 장면 묘사 생성 → 2) 이미지 프롬프트 생성 → 3) 이미지 생성</small>
-                </div>
-                <div style="background-color: #e8f5e8; padding: 10px; border-radius: 5px; margin-top: 5px; border: 1px solid #c3e6cb;">
-                  <small><strong>인물 자동 추가:</strong> @태그로 언급된 새로운 인물은 성별과 첫 번째 사진으로 자동 등록됩니다.</small>
-                </div>
-              </div>
-            </div>
-          </div>
-          <button id="createDiaryButton" onclick="createDiary()">일기 작성 (자동 이미지 생성)</button>
+          <button id="createDiaryButton" onclick="createDiary()" style="padding: 15px 25px; font-size: 16px; font-weight: bold;">5단계: 일기 작성 완료 (이미지 생성)</button>
           <div id="createDiaryResult" class="result"></div>
           <div id="generatedDiaryImage" style="margin-top: 15px;"></div>
         </div>
@@ -728,19 +767,28 @@
         </div>
       </div>
 
-      <!-- Gemini AI 테스트 (v2.1 NEW) -->
+      <!-- Gemini AI 테스트 (v3.0 업데이트) -->
       <div class="section">
         <div class="section-header">
-          <h3>🤖 Gemini AI 테스트</h3>
-          <code>Gemini 2.5 Flash Preview</code>
+          <h3>🤖 Gemini AI 테스트 (v3.0)</h3>
+          <code>Gemini 2.5 Flash Preview - JSON 응답</code>
         </div>
         <div class="section-content">
-          <p>Gemini AI의 연결 상태와 응답을 테스트합니다. (간단한 장면 묘사 생성)</p>
-          <div class="form-group">
-            <label for="testGeminiContent">테스트 일기 내용</label>
-            <textarea id="testGeminiContent" rows="3" placeholder="오늘 공원에서 산책했다. 날씨가 정말 좋았다.">오늘 공원에서 산책했다. 날씨가 정말 좋았다.</textarea>
+          <div class="v3-highlight">
+            <h4>v3.0 Gemini AI 개선사항</h4>
+            <ul>
+              <li><strong>JSON 구조화된 응답:</strong> {TEXT: string, PERSON: string}</li>
+              <li><strong>Temperature 0.85, TopP 0.65:</strong> 더 창의적이고 일관된 응답</li>
+              <li><strong>24,576 토큰 Thinking Budget:</strong> 더 깊이 있는 분석</li>
+              <li><strong>Few-shot 예제:</strong> 일관성 있는 장면 묘사</li>
+            </ul>
           </div>
-          <button id="testGeminiButton" onclick="testGeminiAI()">Gemini AI 테스트</button>
+          <p>v3.0 JSON 기반 Gemini AI의 연결 상태와 응답을 테스트합니다.</p>
+          <div class="form-group">
+            <label for="testGeminiContent">테스트 일기 내용 (@태그 지원)</label>
+            <textarea id="testGeminiContent" rows="3" placeholder="@친구와 공원에서 산책했다. 날씨가 정말 좋았다.">@친구와 공원에서 산책했다. 날씨가 정말 좋았다.</textarea>
+          </div>
+          <button id="testGeminiButton" onclick="testGeminiAI()">v3.0 Gemini AI JSON 테스트</button>
           <div id="testGeminiResult" class="result"></div>
         </div>
       </div>
@@ -779,13 +827,18 @@
     // API 기본 설정
     const API_URL = 'http://localhost:5000/api';
     let authToken = localStorage.getItem('authToken');
-    let lastExtractedProtagonist = null; // 장면 묘사에서 추출된 주인공 이름 저장
-    let lastProtagonistInfo = null; // 장면 묘사에서 받은 주인공 정보 전체 저장 (v2.1)
+    let lastSceneData = null; // v3.0: JSON 장면 묘사 데이터 저장 {TEXT: string, PERSON: string}
     
     // 페이지 로드 시 초기화
     document.addEventListener('DOMContentLoaded', function() {
       checkServerStatus();
       checkTokenStatus();
+      // v3.0: 인물 목록 자동 로드 (약간의 지연을 두어 DOM이 완전히 로드된 후 실행)
+      setTimeout(() => {
+        if (authToken) {
+          loadMyPeopleForSelection();
+        }
+      }, 500);
     });
     
     // 탭 기능
@@ -881,6 +934,10 @@
           localStorage.setItem('authToken', data.token);
           authToken = data.token;
           alert('회원가입 성공! 자동으로 로그인되었습니다.');
+          // 회원가입 성공 후 인물 목록 자동 로드
+          setTimeout(() => {
+            loadMyPeopleForSelection();
+          }, 500);
         }
       } catch (err) {
         displayResult('registerResult', { error: err.message }, false);
@@ -914,6 +971,10 @@
           localStorage.setItem('authToken', data.token);
           authToken = data.token;
           alert('로그인 성공!');
+          // 로그인 성공 후 인물 목록 자동 로드
+          setTimeout(() => {
+            loadMyPeopleForSelection();
+          }, 500);
         }
       } catch (err) {
         displayResult('loginResult', { error: err.message }, false);
@@ -1276,13 +1337,13 @@
         const artStyleId = document.getElementById('diaryArtStyle').value;
         const photos = document.getElementById('diaryPhotos').files;
         
-        // v2.1 새로운 필드들
+        // v3.0 필드들
         const sceneDescription = document.getElementById('sceneDescription').value;
         const userAppearanceKeywords = document.getElementById('userAppearanceKeywords').value;
         const mainCharacterGender = document.getElementById('mainCharacterGender').value;
         
         if (!content || !artStyleId || !userAppearanceKeywords) {
-          displayResult('createDiaryResult', { error: '일기 내용, 화풍, 사용자 외모 키워드는 필수입니다.' }, false);
+          displayResult('createDiaryResult', { error: 'v3.0: 일기 내용, 화풍, 사용자 외모 키워드는 필수입니다.' }, false);
           return;
         }
         
@@ -1294,32 +1355,20 @@
         if (sceneDescription) formData.append('sceneDescription', sceneDescription);
         if (mainCharacterGender) formData.append('mainCharacterGender', mainCharacterGender);
         
-        // 장면 묘사에서 추출된 주인공 이름이 있으면 전달
-        if (lastExtractedProtagonist) {
-          formData.append('protagonistName', lastExtractedProtagonist);
-          console.log('주인공 이름 전달:', lastExtractedProtagonist);
-        }
-        
-        // 장면 묘사에서 받은 주인공 정보가 있으면 전달 (v2.1)
-        if (lastProtagonistInfo) {
-          if (lastProtagonistInfo.personId) {
-            formData.append('mainCharacterPersonId', lastProtagonistInfo.personId);
-            console.log('주인공 PersonId 전달:', lastProtagonistInfo.personId);
+        // v3.0: JSON 장면 데이터가 있으면 전달
+        if (lastSceneData) {
+          if (lastSceneData.PERSON) {
+            formData.append('extractedProtagonist', lastSceneData.PERSON);
+            console.log('v3.0 주인공 전달:', lastSceneData.PERSON);
           }
-          if (lastProtagonistInfo.name) {
-            formData.append('mainCharacterName', lastProtagonistInfo.name);
-            console.log('주인공 이름 전달:', lastProtagonistInfo.name);
-          }
-          if (lastProtagonistInfo.gender) {
-            formData.append('mainCharacterGender', lastProtagonistInfo.gender);
-            console.log('주인공 성별 전달:', lastProtagonistInfo.gender);
-          }
-          console.log('주인공 정보 전체 전달:', lastProtagonistInfo);
+          console.log('v3.0 JSON 데이터 전달:', lastSceneData);
         }
         
         for (let i = 0; i < photos.length; i++) {
           formData.append('photos', photos[i]);
         }
+        
+        console.log('v3.0 일기 작성 요청 시작');
         
         const response = await fetch(`${API_URL}/diaries`, {
           method: 'POST',
@@ -1328,6 +1377,8 @@
         });
         
         const data = await response.json();
+        console.log('v3.0 일기 작성 응답:', data);
+        
         displayResult('createDiaryResult', data, response.ok);
         
         // 생성된 이미지 표시
@@ -1337,14 +1388,14 @@
           img.src = data.diary.generatedImage.startsWith('http') ? data.diary.generatedImage : 
                    data.diary.generatedImage.startsWith('/') ? `http://localhost:5000${data.diary.generatedImage}` : 
                    `http://localhost:5000/${data.diary.generatedImage}`;
-          img.alt = '생성된 일기 이미지';
+          img.alt = 'v3.0 생성된 일기 이미지';
           img.style.maxWidth = '100%';
           img.style.maxHeight = '400px';
           img.style.border = '1px solid #ddd';
           img.style.borderRadius = '5px';
           img.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
           
-          imageContainer.innerHTML = '<h4>생성된 이미지:</h4>';
+          imageContainer.innerHTML = '<h4>v3.0 생성된 이미지:</h4>';
           imageContainer.appendChild(img);
         }
         
@@ -1358,12 +1409,12 @@
           document.getElementById('mainCharacterGender').value = '';
           document.getElementById('diaryPhotos').value = '';
           
-          // 저장된 주인공 이름 초기화
-          lastExtractedProtagonist = null;
-          // 저장된 주인공 정보 초기화 (v2.1)
-          lastProtagonistInfo = null;
+          // v3.0 저장된 데이터 초기화
+          lastSceneData = null;
+          console.log('v3.0 데이터 초기화 완료');
         }
       } catch (err) {
+        console.error('v3.0 일기 작성 오류:', err);
         displayResult('createDiaryResult', { error: err.message }, false);
       } finally {
         setButtonLoading('createDiaryButton', false);
@@ -1663,7 +1714,7 @@
           };
         }
         
-        // Gemini AI 상태 확인 (v2.1 NEW)
+        // Gemini AI 상태 확인 (v3.0 업데이트)
         if (authToken) {
           try {
             const geminiTestBody = {
@@ -1769,8 +1820,6 @@
       }
     }
     
-    // v2.1 새로운 API 함수들
-    
     // 화풍 목록 조회
     async function getArtStyles() {
       try {
@@ -1833,7 +1882,7 @@
       }
     }
     
-    // 장면 묘사 생성
+     // v3.0 장면 묘사 생성 (JSON 기반)
     async function generateSceneDescription() {
       try {
         setButtonLoading('generateSceneButton', true);
@@ -1844,8 +1893,6 @@
         }
         
         const content = document.getElementById('sceneContent').value;
-        const protagonistName = document.getElementById('sceneProtagonist').value;
-        const sceneHint = document.getElementById('sceneHint').value;
         
         if (!content) {
           displayResult('sceneGenerationResult', { error: '일기 내용을 입력해주세요.' }, false);
@@ -1853,10 +1900,10 @@
         }
         
         const requestBody = {
-          content: content,
-          protagonistName: protagonistName || '',
-          sceneDirectionHint: sceneHint || ''
+          content: content
         };
+        
+        console.log('v3.0 장면 묘사 요청:', requestBody);
         
         const response = await fetch(`${API_URL}/diaries/generate-scene`, {
           method: 'POST',
@@ -1868,37 +1915,340 @@
         });
         
         const data = await response.json();
+        console.log('v3.0 장면 묘사 응답:', data);
+        
         displayResult('sceneGenerationResult', data, response.ok);
         
-        // 성공시 일기 작성 폼의 장면 묘사 필드에 자동 입력 및 주인공 이름 저장
-        if (response.ok && data.sceneDescription) {
+        // v3.0: JSON 응답 처리 (새로운 응답 구조)
+        if (response.ok && data.sceneDescription && data.identifiedPerson) {
+          // 일기 작성 폼의 장면 묘사 칸에 자동 입력
           const sceneDescField = document.getElementById('sceneDescription');
           if (sceneDescField) {
             sceneDescField.value = data.sceneDescription;
           }
           
-          // 추출된 주인공 이름 저장
-          if (data.extractedProtagonist) {
-            lastExtractedProtagonist = data.extractedProtagonist;
-            console.log('주인공 이름 저장됨:', lastExtractedProtagonist);
-          }
+          // v3.0 JSON 데이터 저장 (새로운 구조로)
+          lastSceneData = {
+            TEXT: data.sceneDescription,
+            PERSON: data.identifiedPerson,
+            sceneDescription: data.sceneDescription,
+            identifiedPerson: data.identifiedPerson
+          };
           
-          // 주인공 정보 전체 저장 (v2.1)
-          if (data.protagonistInfo) {
-            lastProtagonistInfo = data.protagonistInfo;
-            console.log('주인공 정보 전체 저장됨:', lastProtagonistInfo);
-          }
+          console.log('v3.0 JSON 장면 데이터 저장됨:', lastSceneData);
           
-          alert('생성된 장면 묘사가 일기 작성 폼에 자동으로 입력되었습니다.');
+          // 성공 팝업 표시
+          if (confirm(`✅ 테스트용 JSON 장면 묘사가 생성되었습니다!\n\n주인공: ${data.identifiedPerson}\n장면: ${data.sceneDescription.substring(0, 100)}${data.sceneDescription.length > 100 ? '...' : ''}\n\n📝 일기 작성 섹션으로 이동하고 내용을 자동 입력하시겠습니까?`)) {
+            // 일기 작성 폼에 내용 자동 입력
+            const diaryContentField = document.getElementById('diaryContent');
+            if (diaryContentField && !diaryContentField.value) {
+              diaryContentField.value = document.getElementById('sceneContent').value;
+            }
+            
+            // 일기 섹션으로 자동 이동
+            const diaryTab = document.querySelector('button[onclick="openTab(event, \'diarySection\')"]');
+            if (diaryTab) {
+              diaryTab.click();
+            }
+          }
         }
       } catch (err) {
+        console.error('v3.0 장면 묘사 생성 오류:', err);
         displayResult('sceneGenerationResult', { error: err.message }, false);
       } finally {
         setButtonLoading('generateSceneButton', false);
              }
      }
      
-     // Gemini AI 테스트 함수
+    // v3.0 일기 작성 (기존 인물 선택 방식)
+    async function createDiary() {
+      try {
+        setButtonLoading('createDiaryButton', true);
+        
+        if (!authToken) {
+          displayResult('createDiaryResult', { error: '로그인이 필요합니다.' }, false);
+          return;
+        }
+        
+        const content = document.getElementById('diaryContent').value;
+        const diaryDate = document.getElementById('diaryDate').value;
+        const artStyleId = document.getElementById('diaryArtStyle').value;
+        const photos = document.getElementById('diaryPhotos').files;
+        
+        // v3.0 필드들
+        const sceneDescription = document.getElementById('sceneDescription').value;
+        const selectedMainCharacter = document.getElementById('selectedMainCharacter').value;
+        const userAppearanceKeywords = document.getElementById('userAppearanceKeywords').value;
+        
+        if (!content || !artStyleId || !sceneDescription || !selectedMainCharacter || !userAppearanceKeywords) {
+          displayResult('createDiaryResult', { error: 'v3.0: 일기 내용, 화풍, 장면 묘사, 주요 인물, 사용자 외모 키워드는 필수입니다.' }, false);
+          return;
+        }
+        
+        // v3.0: lastSceneData에서 identifiedPerson 가져오기
+        let identifiedPerson = null;
+        if (lastSceneData && lastSceneData.identifiedPerson) {
+          identifiedPerson = lastSceneData.identifiedPerson;
+        } else if (lastSceneData && lastSceneData.PERSON) {
+          identifiedPerson = lastSceneData.PERSON;
+        }
+        
+        if (!identifiedPerson) {
+          displayResult('createDiaryResult', { error: '먼저 장면 묘사를 생성해주세요. 식별된 인물 정보가 필요합니다.' }, false);
+          return;
+        }
+        
+        console.log('사용할 identifiedPerson:', identifiedPerson);
+        
+        const formData = new FormData();
+        formData.append('content', content);
+        formData.append('artStyleId', artStyleId);
+        formData.append('sceneDescription', sceneDescription);
+        formData.append('identifiedPerson', identifiedPerson);
+        formData.append('selectedPersonId', selectedMainCharacter);
+        formData.append('userAppearanceKeywords', userAppearanceKeywords);
+        if (diaryDate) formData.append('diaryDate', diaryDate);
+        
+        for (let i = 0; i < photos.length; i++) {
+          formData.append('photos', photos[i]);
+        }
+        
+        // 디버깅: FormData 내용 출력
+        console.log('v3.0 일기 작성 요청 시작 (기존 인물 선택 방식)');
+        console.log('FormData 내용:');
+        for (let [key, value] of formData.entries()) {
+          console.log(`${key}:`, value);
+        }
+        
+        const response = await fetch(`${API_URL}/diaries`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` },
+          body: formData
+        });
+        
+        const data = await response.json();
+        console.log('v3.0 일기 작성 응답:', data);
+        
+        displayResult('createDiaryResult', data, response.ok);
+        
+        // 생성된 이미지 표시
+        if (response.ok && data.diary && data.diary.generatedImage) {
+          const imageContainer = document.getElementById('generatedDiaryImage');
+          const img = document.createElement('img');
+          img.src = data.diary.generatedImage.startsWith('http') ? data.diary.generatedImage : 
+                   data.diary.generatedImage.startsWith('/') ? `http://localhost:5000${data.diary.generatedImage}` : 
+                   `http://localhost:5000/${data.diary.generatedImage}`;
+          img.alt = 'v3.0 생성된 일기 이미지';
+          img.style.maxWidth = '100%';
+          img.style.maxHeight = '400px';
+          img.style.border = '1px solid #ddd';
+          img.style.borderRadius = '5px';
+          img.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
+          
+          imageContainer.innerHTML = '<h4>v3.0 생성된 이미지:</h4>';
+          imageContainer.appendChild(img);
+        }
+        
+        if (response.ok) {
+          // 폼 초기화
+          document.getElementById('diaryContent').value = '';
+          document.getElementById('diaryDate').value = '';
+          document.getElementById('diaryArtStyle').value = '';
+          document.getElementById('sceneDescription').value = '';
+          document.getElementById('selectedMainCharacter').value = '';
+          document.getElementById('userAppearanceKeywords').value = '';
+          document.getElementById('diaryPhotos').value = '';
+          
+          // v3.0 저장된 데이터 초기화
+          lastSceneData = null;
+          console.log('v3.0 데이터 초기화 완료');
+        }
+      } catch (err) {
+        console.error('v3.0 일기 작성 오류:', err);
+        displayResult('createDiaryResult', { error: err.message }, false);
+      } finally {
+        setButtonLoading('createDiaryButton', false);
+      }
+    }
+    
+         // v3.0 일기 내용으로 장면 묘사 생성
+     async function generateSceneFromDiary() {
+       try {
+         // 버튼 로딩 상태 설정 (성공하는 방식과 동일하게)
+         const generateButton = document.querySelector('button[onclick="generateSceneFromDiary()"]');
+         if (generateButton) {
+           generateButton.disabled = true;
+           generateButton.textContent = "장면 묘사 생성 중...";
+         }
+         
+         const diaryContent = document.getElementById('diaryContent').value;
+         if (!diaryContent) {
+           alert('먼저 일기 내용을 입력해주세요.');
+           return;
+         }
+         
+         if (!authToken) {
+           alert('로그인이 필요합니다.');
+           return;
+         }
+         
+         const requestBody = {
+           content: diaryContent
+         };
+         
+         console.log('v3.0 장면 묘사 요청:', requestBody);
+         
+         const response = await fetch(`${API_URL}/diaries/generate-scene`, {
+           method: 'POST',
+           headers: {
+             'Authorization': `Bearer ${authToken}`,
+             'Content-Type': 'application/json'
+           },
+           body: JSON.stringify(requestBody)
+         });
+         
+         const data = await response.json();
+         console.log('v3.0 장면 묘사 응답:', data);
+         
+         if (response.ok && data.sceneDescription && data.identifiedPerson) {
+           // 장면 묘사 칸에 자동 입력
+           const sceneDescField = document.getElementById('sceneDescription');
+           if (sceneDescField) {
+             sceneDescField.value = data.sceneDescription;
+           }
+           
+           // v3.0 JSON 데이터 저장 (새로운 구조로)
+           lastSceneData = {
+             TEXT: data.sceneDescription,
+             PERSON: data.identifiedPerson,
+             sceneDescription: data.sceneDescription,
+             identifiedPerson: data.identifiedPerson
+           };
+           
+           console.log('v3.0 JSON 장면 데이터 저장됨:', lastSceneData);
+           
+           // 성공 팝업 표시
+           alert(`✅ 장면 묘사가 생성되었습니다!\n\n주인공: ${data.identifiedPerson}\n장면: ${data.sceneDescription.substring(0, 100)}${data.sceneDescription.length > 100 ? '...' : ''}\n\n다음 단계: 주요 인물을 선택해주세요.`);
+           
+         } else {
+           throw new Error(data.message || '장면 묘사 생성에 실패했습니다.');
+         }
+         
+       } catch (err) {
+         console.error('일기 내용으로 장면 묘사 생성 오류:', err);
+         alert('❌ 장면 묘사 생성 중 오류가 발생했습니다: ' + err.message);
+       } finally {
+         // 버튼 상태 복원
+         const generateButton = document.querySelector('button[onclick="generateSceneFromDiary()"]');
+         if (generateButton) {
+           generateButton.disabled = false;
+           generateButton.textContent = "2단계: 장면 묘사 자동 생성";
+         }
+       }
+     }
+     
+     // v3.0 내 인물 목록을 선택 옵션으로 로드
+     async function loadMyPeopleForSelection() {
+       try {
+         if (!authToken) {
+           console.log('토큰이 없어 인물 목록 로드를 건너뜁니다.');
+           return;
+         }
+         
+         const response = await fetch(`${API_URL}/people`, {
+           headers: { 'Authorization': `Bearer ${authToken}` }
+         });
+         
+         if (response.ok) {
+           const data = await response.json();
+           const select = document.getElementById('selectedMainCharacter');
+           
+           if (!select) {
+             console.log('selectedMainCharacter 엘리먼트를 찾을 수 없습니다.');
+             return;
+           }
+           
+           // 기존 옵션 제거 (첫 번째 옵션 제외)
+           while (select.children.length > 1) {
+             select.removeChild(select.lastChild);
+           }
+           
+           // 새 옵션 추가
+           if (data.people && Array.isArray(data.people)) {
+             console.log('인물 목록 로드:', data.people);
+             data.people.forEach(person => {
+               const option = document.createElement('option');
+               option.value = person._id;
+               option.textContent = `${person.name} (${person.gender || '성별 미지정'})`;
+               select.appendChild(option);
+             });
+             console.log(`${data.people.length}개의 인물이 로드되었습니다.`);
+           } else {
+             console.log('인물 데이터가 없거나 형식이 올바르지 않습니다:', data);
+           }
+         } else {
+           const errorData = await response.json();
+           console.error('인물 목록 로드 실패:', errorData);
+           alert('인물 목록을 불러오는데 실패했습니다: ' + (errorData.message || '알 수 없는 오류'));
+         }
+       } catch (err) {
+         console.error('인물 목록 로드 오류:', err);
+         alert('인물 목록 로드 중 오류가 발생했습니다: ' + err.message);
+       }
+     }
+
+     // v3.0 피드백이 있는 인물 목록 로드 (버튼 클릭용)
+     async function loadMyPeopleForSelectionWithFeedback() {
+       try {
+         if (!authToken) {
+           alert('로그인이 필요합니다.');
+           return;
+         }
+         
+         const response = await fetch(`${API_URL}/people`, {
+           headers: { 'Authorization': `Bearer ${authToken}` }
+         });
+         
+         if (response.ok) {
+           const data = await response.json();
+           const select = document.getElementById('selectedMainCharacter');
+           
+           if (!select) {
+             alert('인물 선택 드롭다운을 찾을 수 없습니다.');
+             return;
+           }
+           
+           // 기존 옵션 제거 (첫 번째 옵션 제외)
+           while (select.children.length > 1) {
+             select.removeChild(select.lastChild);
+           }
+           
+           // 새 옵션 추가
+           if (data.people && Array.isArray(data.people)) {
+             if (data.people.length > 0) {
+               data.people.forEach(person => {
+                 const option = document.createElement('option');
+                 option.value = person._id;
+                 option.textContent = `${person.name} (${person.gender || '성별 미지정'})`;
+                 select.appendChild(option);
+               });
+               alert(`${data.people.length}개의 인물이 로드되었습니다.`);
+             } else {
+               alert('등록된 인물이 없습니다. 먼저 인물을 추가해주세요.');
+             }
+           } else {
+             alert('인물 데이터 형식이 올바르지 않습니다.');
+           }
+         } else {
+           const errorData = await response.json();
+           alert('인물 목록을 불러오는데 실패했습니다: ' + (errorData.message || '알 수 없는 오류'));
+         }
+       } catch (err) {
+         alert('인물 목록 로드 중 오류가 발생했습니다: ' + err.message);
+       }
+     }
+
+     // v3.0 Gemini AI 테스트 함수
      async function testGeminiAI() {
        try {
          setButtonLoading('testGeminiButton', true);
@@ -1908,13 +2258,13 @@
            return;
          }
          
-         const content = document.getElementById('testGeminiContent').value || '오늘 공원에서 산책했다. 날씨가 정말 좋았다.';
+        const content = document.getElementById('testGeminiContent').value || '@친구와 공원에서 산책했다. 날씨가 정말 좋았다.';
          
          const requestBody = {
-           content: content,
-           protagonistName: '테스트',
-           sceneDirectionHint: '테스트용 장면'
+          content: content
          };
+        
+        console.log('v3.0 Gemini 테스트 요청:', requestBody);
          
          const startTime = Date.now();
          const response = await fetch(`${API_URL}/diaries/generate-scene`, {
@@ -1929,22 +2279,32 @@
          
          const data = await response.json();
          
-         // 응답 시간 추가
+        // v3.0 응답 분석
          const testResult = {
            ...data,
            responseTime: `${endTime - startTime}ms`,
            geminiModel: 'gemini-2.5-flash-preview-05-20',
+          version: 'v3.0',
+          features: {
+            jsonStructured: !!(data.sceneDescription && data.identifiedPerson),
+            smartTagSupport: true,
+            thinkingBudget: '24,576 tokens',
+            temperature: 0.85,
+            topP: 0.65
+          },
            testTimestamp: new Date().toISOString()
          };
+        
+        console.log('v3.0 Gemini 테스트 결과:', testResult);
          
          displayResult('testGeminiResult', testResult, response.ok);
        } catch (err) {
+        console.error('v3.0 Gemini 테스트 오류:', err);
          displayResult('testGeminiResult', { error: err.message }, false);
        } finally {
          setButtonLoading('testGeminiButton', false);
        }
      }
-     
 
   </script>
 </body>
