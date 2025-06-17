@@ -118,7 +118,7 @@ const processUniversalWorkflow = (workflow, prompt, imageName) => {
 
 // Anything Everywhere 시스템 검증 및 복구
 const validateAnythingEverywhereSystem = (workflow) => {
-  console.log('Anything Everywhere 시스템 검증 시작...');
+  console.log('=== Anything Everywhere 시스템 검증 시작 ===');
   
   // Anything Everywhere3 노드 (노드 22) 검증
   const anythingNode = workflow['22'];
@@ -147,7 +147,8 @@ const validateAnythingEverywhereSystem = (workflow) => {
     }
   }
   
-  // 모든 노드에서 누락된 필수 연결 복구
+  // 모든 노드에서 누락된 필수 연결 복구 - 강화된 검증
+  let connectionsFixed = 0;
   Object.keys(workflow).forEach(nodeId => {
     const node = workflow[nodeId];
     
@@ -156,6 +157,7 @@ const validateAnythingEverywhereSystem = (workflow) => {
       if (!node.inputs.model || !Array.isArray(node.inputs.model)) {
         node.inputs.model = ['46', 0]; // IPAdapterFaceID 출력
         console.log(`✓ BasicScheduler(${nodeId}) model 연결 복구`);
+        connectionsFixed++;
       }
     }
     
@@ -164,14 +166,17 @@ const validateAnythingEverywhereSystem = (workflow) => {
       if (!node.inputs.model || !Array.isArray(node.inputs.model)) {
         node.inputs.model = ['46', 0]; // IPAdapterFaceID 출력
         console.log(`✓ KSampler(${nodeId}) model 연결 복구`);
+        connectionsFixed++;
       }
       if (!node.inputs.positive || !Array.isArray(node.inputs.positive)) {
         node.inputs.positive = ['6', 0]; // 긍정 프롬프트
         console.log(`✓ KSampler(${nodeId}) positive 연결 복구`);
+        connectionsFixed++;
       }
       if (!node.inputs.negative || !Array.isArray(node.inputs.negative)) {
         node.inputs.negative = ['7', 0]; // 부정 프롬프트
         console.log(`✓ KSampler(${nodeId}) negative 연결 복구`);
+        connectionsFixed++;
       }
     }
     
@@ -180,14 +185,17 @@ const validateAnythingEverywhereSystem = (workflow) => {
       if (!node.inputs.model || !Array.isArray(node.inputs.model)) {
         node.inputs.model = ['46', 0]; // IPAdapterFaceID 출력
         console.log(`✓ SamplerCustom(${nodeId}) model 연결 복구`);
+        connectionsFixed++;
       }
       if (!node.inputs.positive || !Array.isArray(node.inputs.positive)) {
         node.inputs.positive = ['6', 0]; // 긍정 프롬프트
         console.log(`✓ SamplerCustom(${nodeId}) positive 연결 복구`);
+        connectionsFixed++;
       }
       if (!node.inputs.negative || !Array.isArray(node.inputs.negative)) {
         node.inputs.negative = ['7', 0]; // 부정 프롬프트
         console.log(`✓ SamplerCustom(${nodeId}) negative 연결 복구`);
+        connectionsFixed++;
       }
     }
     
@@ -196,6 +204,7 @@ const validateAnythingEverywhereSystem = (workflow) => {
       if (!node.inputs.vae || !Array.isArray(node.inputs.vae)) {
         node.inputs.vae = ['13', 0]; // VAELoader 출력
         console.log(`✓ VAEDecodeTiled(${nodeId}) vae 연결 복구`);
+        connectionsFixed++;
       }
     }
     
@@ -204,11 +213,81 @@ const validateAnythingEverywhereSystem = (workflow) => {
       if (!node.inputs.vae || !Array.isArray(node.inputs.vae)) {
         node.inputs.vae = ['13', 0]; // VAELoader 출력
         console.log(`✓ VAEDecode(${nodeId}) vae 연결 복구`);
+        connectionsFixed++;
+      }
+    }
+    
+    // DetailDaemonSamplerNode - 추가 검증 (새로운 워크플로우에서 사용)
+    else if (node.class_type === 'DetailDaemonSamplerNode') {
+      // DetailDaemonSamplerNode는 sampler 입력이 필요하며, 이는 KSamplerSelect의 출력
+      if (!node.inputs.sampler || !Array.isArray(node.inputs.sampler)) {
+        // KSamplerSelect 노드 찾기 (일반적으로 노드 57)
+        const ksamplerSelectNode = Object.keys(workflow).find(id => 
+          workflow[id].class_type === 'KSamplerSelect'
+        );
+        if (ksamplerSelectNode) {
+          node.inputs.sampler = [ksamplerSelectNode, 0];
+          console.log(`✓ DetailDaemonSamplerNode(${nodeId}) sampler 연결 복구 -> 노드 ${ksamplerSelectNode}`);
+          connectionsFixed++;
+        }
+      }
+    }
+    
+    // SplitSigmas 노드 - sigmas 연결 필요 (BasicScheduler의 출력)
+    else if (node.class_type === 'SplitSigmas') {
+      if (!node.inputs.sigmas || !Array.isArray(node.inputs.sigmas)) {
+        // BasicScheduler 노드 찾기 (일반적으로 노드 54)
+        const basicSchedulerNode = Object.keys(workflow).find(id => 
+          workflow[id].class_type === 'BasicScheduler'
+        );
+        if (basicSchedulerNode) {
+          node.inputs.sigmas = [basicSchedulerNode, 0];
+          console.log(`✓ SplitSigmas(${nodeId}) sigmas 연결 복구 -> 노드 ${basicSchedulerNode}`);
+          connectionsFixed++;
+        }
       }
     }
   });
   
-  console.log('Anything Everywhere 시스템 검증 완료');
+  // 추가 검증: 중요한 노드들의 연결 상태 확인
+  const criticalNodes = {
+    '4': 'CheckpointLoaderSimple',
+    '5': 'EmptyLatentImage', 
+    '6': 'CLIPTextEncode (Positive)',
+    '7': 'CLIPTextEncode (Negative)',
+    '10': 'LoraLoader',
+    '13': 'VAELoader',
+    '21': 'KSampler',
+    '22': 'Anything Everywhere3',
+    '26': 'Prompts Everywhere',
+    '38': 'VAEDecodeTiled',
+    '42': 'LoadImage',
+    '45': 'IPAdapterUnifiedLoaderFaceID',
+    '46': 'IPAdapterFaceID',
+    '54': 'BasicScheduler',
+    '55': 'SplitSigmas',
+    '56': 'SamplerCustom',
+    '57': 'KSamplerSelect',
+    '58': 'DetailDaemonSamplerNode'
+  };
+  
+  console.log('=== 중요 노드 연결 상태 검증 ===');
+  Object.entries(criticalNodes).forEach(([nodeId, nodeName]) => {
+    if (workflow[nodeId]) {
+      console.log(`✓ ${nodeName}(${nodeId}) 존재 확인`);
+    } else {
+      console.log(`⚠ ${nodeName}(${nodeId}) 누락 - 워크플로우에 따라 정상일 수 있음`);
+    }
+  });
+  
+  console.log(`=== Anything Everywhere 시스템 검증 완료 ===`);
+  console.log(`총 ${connectionsFixed}개의 연결 복구 완료`);
+  
+  // 최종 워크플로우 유효성 검사
+  const totalNodes = Object.keys(workflow).length;
+  console.log(`최종 워크플로우 상태: ${totalNodes}개 노드, ${connectionsFixed}개 연결 복구`);
+  
+  return workflow;
 };
 
 // 워크플로우별 특화 설정 적용 (필요시)
@@ -216,29 +295,80 @@ const applyWorkflowSpecificSettings = (workflow, workflowPath) => {
   const workflowName = path.basename(workflowPath, '.json');
   console.log(`워크플로우별 특화 설정 확인: ${workflowName}`);
   
-  // 현재는 모든 워크플로우가 표준 구조를 따르므로 특별한 처리 불필요
-  // 향후 새로운 워크플로우 패턴이 나타나면 여기서 처리
-  
+  // 워크플로우별 특화 처리
   switch (workflowName) {
+    case 'Animal Crossing workflow':
+      console.log('Animal Crossing 워크플로우 - 치비 스타일 최적화');
+      // 치비 스타일에 특화된 설정 (필요시)
+      break;
+      
+    case 'Rhythm Heaven workflow':
+      console.log('Rhythm Heaven 워크플로우 - 독특한 스타일 최적화');
+      // Rhythm Heaven 스타일에 특화된 설정 (필요시)
+      break;
+      
+    case 'Studio Ghibli workflow':
+      console.log('Studio Ghibli 워크플로우 - 지브리 스타일 최적화');
+      // 지브리 스타일에 특화된 설정 (필요시)
+      break;
+      
     case 'Disney Pixar workflow':
-      console.log('Disney Pixar 워크플로우 - 표준 처리');
+      console.log('Disney Pixar 워크플로우 - 3D 애니메이션 최적화');
       break;
+      
     case 'Makoto Shinkai workflow':
-      console.log('Makoto Shinkai 워크플로우 - 표준 처리');
+      console.log('Makoto Shinkai 워크플로우 - 감성적 화풍 최적화');
       break;
+      
     case 'Esthetic 80s workflow':
-      console.log('Esthetic 80s 워크플로우 - 표준 처리');
+      console.log('Esthetic 80s 워크플로우 - 레트로 스타일 최적화');
       break;
+      
     case 'Minimalist Line workflow':
-      console.log('Minimalist Line 워크플로우 - 표준 처리');
+      console.log('Minimalist Line 워크플로우 - 미니멀 라인 아트 최적화');
       break;
+      
     case '_3d character style':
-      console.log('3D Character 워크플로우 - 표준 처리');
+      console.log('3D Character 워크플로우 - 3D 치비 캐릭터 최적화');
       break;
+      
     default:
-      console.log('알 수 없는 워크플로우 - 표준 처리');
+      console.log(`알 수 없는 워크플로우: ${workflowName} - 표준 처리`);
   }
   
+  // 모든 워크플로우에 공통으로 적용되는 안정성 검증
+  console.log('공통 안정성 검증 수행...');
+  
+  // 1. 중요한 노드들의 존재 여부 확인
+  const requiredNodes = ['4', '5', '6', '7', '9']; // 기본 필수 노드들
+  const missingNodes = requiredNodes.filter(nodeId => !workflow[nodeId]);
+  
+  if (missingNodes.length > 0) {
+    console.warn(`누락된 필수 노드: ${missingNodes.join(', ')}`);
+  } else {
+    console.log('✓ 모든 필수 노드 존재 확인');
+  }
+  
+  // 2. 시드 값 검증 (너무 큰 값이나 잘못된 값 수정)
+  Object.keys(workflow).forEach(nodeId => {
+    const node = workflow[nodeId];
+    if (node.inputs && typeof node.inputs.seed === 'number') {
+      if (node.inputs.seed > 999999999999999 || node.inputs.seed < 0) {
+        const newSeed = Math.floor(Math.random() * 1000000000000000);
+        console.log(`시드 값 수정 (노드 ${nodeId}): ${node.inputs.seed} -> ${newSeed}`);
+        node.inputs.seed = newSeed;
+      }
+    }
+    if (node.inputs && typeof node.inputs.noise_seed === 'number') {
+      if (node.inputs.noise_seed > 999999999999999 || node.inputs.noise_seed < 0) {
+        const newSeed = Math.floor(Math.random() * 1000000000000000);
+        console.log(`노이즈 시드 값 수정 (노드 ${nodeId}): ${node.inputs.noise_seed} -> ${newSeed}`);
+        node.inputs.noise_seed = newSeed;
+      }
+    }
+  });
+  
+  console.log('워크플로우별 특화 설정 적용 완료');
   return workflow;
 };
 

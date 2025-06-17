@@ -24,7 +24,7 @@ Express.js 기반의 일기 애플리케이션 백엔드 서버이다. 사용자
 - **JWT 기반 사용자 인증** - 안전한 사용자 관리
 - **AI 이미지 생성** - 두 단계 프로세스로 고품질 이미지 생성 
 - **주인공 연동** - @태그를 통한 인물 자동 인식 및 관리
-- **다양한 화풍 지원** - 5가지 화풍 스타일 (신카이 마코토, 80s 레트로, 3D 캐릭터, 미니멀 라인, 디즈니 픽사)
+- **다양한 화풍 지원** - 8가지 화풍 스타일 (신카이 마코토, 80s 레트로, 3D 캐릭터, 미니멀 라인, 디즈니 픽사, 동물의 숲, 리듬 헤븐, 스튜디오 지브리)
 - **ComfyUI 연동** - 동적 워크플로우 선택 및 고품질 AI 이미지 생성
 
 ## 주요 기능
@@ -54,12 +54,15 @@ Express.js 기반의 일기 애플리케이션 백엔드 서버이다. 사용자
 - **두 단계 프로세스**:
   1. **장면 묘사 생성**: Gemini AI로 일기 내용을 시각적 장면으로 변환
   2. **이미지 프롬프트 생성**: 장면 묘사 + 사용자 외모 키워드로 ComfyUI 프롬프트 생성
-- **5가지 화풍 지원**: 
+- **8가지 화풍 지원**: 
   - 신카이 마코토 (Makoto Shinkai)
   - 에스테틱 80년대 (Esthetic 80s)
   - 3D 캐릭터 (3D Character - Chibi)
   - 미니멀 라인 (Minimalist Line)
   - 디즈니 픽사 (Disney Pixar)
+  - 동물의 숲 (Animal Crossing)
+  - 리듬 헤븐 (Rhythm Heaven)
+  - 스튜디오 지브리 (Studio Ghibli)
 - **범용 워크플로우 시스템**: GUI와 100% 동일한 설정값으로 이미지 생성
 - **자동 워크플로우 관리**: 새로운 화풍 추가 시 자동 처리
 - **고급 프롬프트 엔지니어링**: Google Gemini 2.5 Flash Preview 기반 3단계 AI 파이프라인
@@ -280,6 +283,9 @@ COMFY_OUTPUT_DIR=/your/comfyui/path/output
 - `_3d character style.json`
 - `Minimalist Line workflow.json`
 - `Disney Pixar workflow.json`
+- `Animal Crossing workflow.json`
+- `Rhythm Heaven workflow.json`
+- `Studio Ghibli workflow.json`
 
 5. **서버 실행**
 ```bash
@@ -314,7 +320,7 @@ curl http://localhost:5000/api/test-comfyui
 
 ### 🚀 새로운 기능
 - **Gemini AI 연동**: Google Gemini API 설정 추가 (`src/config/geminiConfig.js`)
-- **5개 화풍 워크플로우**: Disney Pixar, Esthetic 80s, Makoto Shinkai, Minimalist Line, 3D Character
+- **8개 화풍 워크플로우**: Disney Pixar, Esthetic 80s, Makoto Shinkai, Minimalist Line, 3D Character, Animal Crossing, Rhythm Heaven, Studio Ghibli
 - **원본 워크플로우 보존**: 모든 설정값과 노드 구조를 그대로 유지
 
 ### 🔧 기능 개선
@@ -360,6 +366,10 @@ curl http://localhost:5000/api/test-comfyui
 - **새로운 API 엔드포인트**:
   - `GET /api/diaries/art-styles` - 화풍 목록 조회
   - `POST /api/diaries/generate-scene` - 장면 묘사 생성
+- **새로운 워크플로우 추가** (v2.1.2):
+  - Animal Crossing workflow.json - 동물의 숲 스타일 치비 캐릭터
+  - Rhythm Heaven workflow.json - 리듬 헤븐 스타일 독특한 화풍
+  - Studio Ghibli workflow.json - 스튜디오 지브리 애니메이션 화풍
 
 ### 🔄 변경된 기능
 - **AI 모델**: OpenAI GPT → Google Gemini 2.5 Flash Preview
@@ -388,7 +398,7 @@ curl http://localhost:5000/api/test-comfyui
 - **새로운 Gen AI SDK**: @google/genai 패키지 사용 (최신 공식 라이브러리)
 - **두 단계 프로세스**: 장면 분석 → 프롬프트 생성
 - **ComfyUI API 연동**: 동적 워크플로우 선택
-- **5가지 화풍 워크플로우**: 신카이 마코토, 80s 레트로, 3D 캐릭터, 미니멀 라인, 디즈니 픽사
+- **8가지 화풍 워크플로우**: 신카이 마코토, 80s 레트로, 3D 캐릭터, 미니멀 라인, 디즈니 픽사, 동물의 숲, 리듬 헤븐, 스튜디오 지브리
 - 실시간 이미지 생성 및 저장
 
 #### 데이터베이스 설계 (100%)
@@ -460,7 +470,10 @@ backend/
 │   ├── Esthetic 80s workflow.json
 │   ├── _3d character style.json
 │   ├── Minimalist Line workflow.json
-│   └── Disney Pixar workflow.json
+│   ├── Disney Pixar workflow.json
+│   ├── Animal Crossing workflow.json
+│   ├── Rhythm Heaven workflow.json
+│   └── Studio Ghibli workflow.json
 ├── uploads/               # 업로드된 파일
 ├── pictures/              # 문서용 이미지
 ├── package.json           # Gemini AI 의존성 추가
