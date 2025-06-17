@@ -27,10 +27,6 @@ const registerUser = async (req, res) => {
       profilePhoto = `/uploads/${req.file.filename}`;
     }
 
-    console.log('=== 회원가입 시도 ===');
-    console.log('이메일:', email);
-    console.log('원본 비밀번호 길이:', password ? password.length : 0);
-
     // 비밀번호는 User 모델의 pre('save') 미들웨어에서 해싱되므로 여기서는 해싱하지 않음
     const userData = {
       username,
@@ -42,10 +38,6 @@ const registerUser = async (req, res) => {
 
     // 사용자 생성
     const user = await User.create(userData);
-    
-    console.log('사용자 생성 완료');
-    console.log('해시된 비밀번호 길이:', user.password ? user.password.length : 0);
-    console.log('해시된 비밀번호 시작:', user.password ? user.password.substring(0, 10) + '...' : 'null');
 
     if (user) {
       res.status(201).json({
@@ -70,27 +62,14 @@ const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    console.log('=== 로그인 시도 ===');
-    console.log('이메일:', email);
-    console.log('비밀번호 길이:', password ? password.length : 0);
-
     // 이메일로 사용자 찾기 (비밀번호 필드 포함)
     const user = await User.findOne({ email }).select('+password');
-
-    console.log('사용자 찾기 결과:', user ? '발견' : '없음');
-    if (user) {
-      console.log('사용자 ID:', user._id);
-      console.log('해시된 비밀번호 길이:', user.password ? user.password.length : 0);
-      console.log('해시된 비밀번호 시작:', user.password ? user.password.substring(0, 10) + '...' : 'null');
-    }
 
     // 사용자 존재 및 비밀번호 확인
     if (user) {
       const passwordMatch = await user.matchPassword(password);
-      console.log('비밀번호 매칭 결과:', passwordMatch);
       
       if (passwordMatch) {
-        console.log('로그인 성공');
         res.json({
           _id: user._id,
           username: user.username,
@@ -100,11 +79,9 @@ const loginUser = async (req, res) => {
           token: generateToken(user._id),
         });
       } else {
-        console.log('비밀번호 불일치');
         res.status(401).json({ message: '이메일 또는 비밀번호가 올바르지 않습니다.' });
       }
     } else {
-      console.log('사용자를 찾을 수 없음');
       res.status(401).json({ message: '이메일 또는 비밀번호가 올바르지 않습니다.' });
     }
   } catch (error) {
