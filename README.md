@@ -240,20 +240,46 @@ OPENAI_API_KEY=your_openai_api_key
 
 # ComfyUI 설정
 COMFY_SERVER_URL=http://127.0.0.1:8188
+COMFY_INPUT_DIR=/path/to/ComfyUI/input
+COMFY_OUTPUT_DIR=/path/to/ComfyUI/output
+
+# 예시 - Windows
+# COMFY_INPUT_DIR=C:\ComfyUI_windows_portable\ComfyUI\input
+# COMFY_OUTPUT_DIR=C:\ComfyUI_windows_portable\ComfyUI\output
+
+# 예시 - macOS/Linux
+# COMFY_INPUT_DIR=/opt/ComfyUI/input
+# COMFY_OUTPUT_DIR=/opt/ComfyUI/output
 ```
 
 4. **ComfyUI 설정**
-- ComfyUI 설치 및 실행
-- 필요한 모델 파일 설치:
-  - SD XL Turbo 모델
-  - ControlNet OpenPose 모델  
-  - VAE 모델
-- 워크플로우 파일 확인 (workflows/ 디렉토리):
-  - `Makoto Shinkai workflow.json`
-  - `Esthetic 80s workflow.json`
-  - `_3d character style.json`
-  - `Minimalist Line workflow.json`
-  - `Disney Pixar workflow.json`
+
+#### ComfyUI 디렉토리 설정
+ComfyUI 디렉토리 경로는 다음과 같이 설정할 수 있습니다:
+
+**방법 1: 환경 변수 사용 (권장)**
+```env
+COMFY_INPUT_DIR=/your/comfyui/path/input
+COMFY_OUTPUT_DIR=/your/comfyui/path/output
+```
+
+**방법 2: 자동 감지**
+환경 변수가 설정되지 않은 경우, 다음 경로에서 자동으로 감지합니다:
+- **Windows**: `C:\ComfyUI_windows_portable_nvidia\ComfyUI_windows_portable\ComfyUI\input`
+- **macOS/Linux**: `/opt/ComfyUI/input`, `/usr/local/ComfyUI/input`
+- **홈 디렉토리**: `~/ComfyUI/input`
+
+#### 필요한 모델 파일
+- SD XL Turbo 모델
+- ControlNet OpenPose 모델  
+- VAE 모델
+
+#### 워크플로우 파일 확인 (workflows/ 디렉토리)
+- `Makoto Shinkai workflow.json`
+- `Esthetic 80s workflow.json`
+- `_3d character style.json`
+- `Minimalist Line workflow.json`
+- `Disney Pixar workflow.json`
 
 5. **서버 실행**
 ```bash
@@ -318,6 +344,7 @@ curl http://localhost:5000/api/test-comfyui
 - **성별과 외형 키워드 분리**: AI 프롬프트 생성에서 성별 정보를 별도 처리
 - **워크플로우 원본 사용**: artStyles.json 설정 대신 워크플로우 파일 그대로 사용
 - **인물 자동 추가 개선**: @태그 인물의 성별 선택 및 자동 연락처 등록 기능 강화
+- **ComfyUI 경로 설정 개선**: 하드코딩된 Windows 경로를 환경 변수 기반으로 변경하여 크로스 플랫폼 호환성 확보
 
 ### 🔴 제거된 기능
 - **Person 모델 간소화**: hairStyle, clothing, accessories 필드 제거 (성별만 유지)

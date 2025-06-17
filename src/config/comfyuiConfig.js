@@ -4,6 +4,69 @@ const path = require('path');
 const WebSocket = require('ws');
 const fetch = require('node-fetch');
 
+// ComfyUI 설정 관리
+const getComfyUIConfig = () => {
+  const config = {
+    serverUrl: process.env.COMFY_SERVER_URL || 'http://127.0.0.1:8188',
+    inputDir: process.env.COMFY_INPUT_DIR || null,
+    outputDir: process.env.COMFY_OUTPUT_DIR || null
+  };
+  
+  // 기본 경로 추론 시도 (환경 변수가 없는 경우)
+  if (!config.inputDir) {
+    const possiblePaths = [
+      // Windows 일반적인 설치 경로들
+      'C:\\ComfyUI_windows_portable_nvidia\\ComfyUI_windows_portable\\ComfyUI\\input',
+      'C:\\ComfyUI\\input',
+      'C:\\ComfyUI_windows_portable\\ComfyUI\\input',
+      // macOS/Linux 일반적인 설치 경로들
+      '/opt/ComfyUI/input',
+      '/usr/local/ComfyUI/input',
+      path.join(process.env.HOME || process.env.USERPROFILE || '', 'ComfyUI', 'input'),
+      // 현재 디렉토리 기준
+      path.join(process.cwd(), 'ComfyUI', 'input'),
+      path.join(process.cwd(), '..', 'ComfyUI', 'input')
+    ];
+    
+    // 존재하는 첫 번째 경로 사용
+    for (const testPath of possiblePaths) {
+      if (fs.existsSync(testPath)) {
+        config.inputDir = testPath;
+        console.log(`ComfyUI input 디렉토리 자동 감지: ${testPath}`);
+        break;
+      }
+    }
+  }
+  
+  return config;
+};
+
+// 이미지를 ComfyUI input 폴더로 복사하는 함수
+const copyImageToComfyUI = (imagePath, imageName) => {
+  try {
+    const config = getComfyUIConfig();
+    
+    if (!config.inputDir) {
+      console.warn('ComfyUI input 디렉토리를 찾을 수 없습니다. 환경 변수 COMFY_INPUT_DIR을 설정하거나 ComfyUI를 표준 경로에 설치하세요.');
+      return false;
+    }
+    
+    if (!fs.existsSync(config.inputDir)) {
+      console.warn(`ComfyUI input 디렉토리가 존재하지 않습니다: ${config.inputDir}`);
+      return false;
+    }
+    
+    const destPath = path.join(config.inputDir, imageName);
+    fs.copyFileSync(imagePath, destPath);
+    console.log(`이미지 ComfyUI input 폴더로 복사 완료: ${destPath}`);
+    return true;
+    
+  } catch (copyError) {
+    console.error('이미지 복사 오류:', copyError.message);
+    return false;
+  }
+};
+
 // 범용 워크플로우 처리 시스템
 const processUniversalWorkflow = (workflow, prompt, imageName) => {
   console.log('=== 범용 워크플로우 처리 시작 ===');
@@ -182,7 +245,8 @@ const applyWorkflowSpecificSettings = (workflow, workflowPath) => {
 // ComfyUI API 호출 함수 - fetch API 사용
 const runComfyWorkflow = async (workflow) => {
   try {
-    const COMFY_SERVER = process.env.COMFY_SERVER_URL || 'http://127.0.0.1:8188';
+    const config = getComfyUIConfig();
+    const COMFY_SERVER = config.serverUrl;
     console.log(`ComfyUI API 호출 시작... 서버 URL: ${COMFY_SERVER}`);
     
     // 먼저 ComfyUI 서버 연결 테스트
@@ -335,9 +399,9 @@ const runComfyWorkflow = async (workflow) => {
           
           if (Object.keys(historyData).length === 0) {
             console.log(`${waitTime/1000}초 경과: prompt_id=${result.prompt_id}에 대한 히스토리 데이터가 없습니다.`);
-          continue;
-        }
-        
+            continue;
+          }
+          
           const promptData = historyData[result.prompt_id];
           if (promptData && promptData.status && promptData.status.completed) {
             if (!executionTime) {
@@ -369,8 +433,8 @@ const runComfyWorkflow = async (workflow) => {
                   
                   if (imageCheckResponse.ok) {
                     imageFound = true;
-              break;
-            } 
+                    break;
+                  } 
                 }
               }
               
@@ -453,13 +517,9 @@ const runOriginalWorkflow = async (workflowPath, prompt, imageName, artStyleConf
         
         // ComfyUI input 폴더로 이미지 복사
         try {
-          const comfyInputDir = 'C:\\ComfyUI_windows_portable_nvidia\\ComfyUI_windows_portable\\ComfyUI\\input';
-          if (fs.existsSync(comfyInputDir)) {
-            const destPath = path.join(comfyInputDir, imageName);
-            fs.copyFileSync(imagePath, destPath);
-            console.log(`이미지 ComfyUI input 폴더로 복사 완료: ${destPath}`);
-          } else {
-            console.warn(`ComfyUI input 폴더를 찾을 수 없습니다: ${comfyInputDir}`);
+          const copyResult = copyImageToComfyUI(imagePath, imageName);
+          if (!copyResult) {
+            throw new Error('이미지를 ComfyUI input 폴더로 복사하는 데 실패했습니다.');
           }
         } catch (copyError) {
           console.error('이미지 복사 오류:', copyError.message);
@@ -521,6 +581,10 @@ module.exports = {
   validateAnythingEverywhereSystem,
   applyWorkflowSpecificSettings,
   runComfyWorkflow,
+  
+  // ComfyUI 설정 및 파일 관리
+  getComfyUIConfig,
+  copyImageToComfyUI,
   
   // 하위 호환성을 위한 기존 함수들 (새 시스템으로 리다이렉트)
   customizeWorkflow: (workflow, settings) => processUniversalWorkflow(workflow, '', null),
