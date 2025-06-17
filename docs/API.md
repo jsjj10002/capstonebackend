@@ -1,4 +1,4 @@
-# 일기 앱 백엔드 API 명세서
+# 일기 앱 백엔드 API 명세서 v2.1
 
 ## 📋 목차
 
@@ -17,6 +17,7 @@
 - **Protocol**: HTTP/HTTPS
 - **Data Format**: JSON
 - **Authentication**: JWT Bearer Token
+- **Version**: v2.1
 
 ### 기술 스택
 - **Runtime**: Node.js
@@ -24,7 +25,9 @@
 - **Database**: MongoDB with Mongoose
 - **Authentication**: JWT
 - **File Upload**: Multer
-- **AI Services**: OpenAI o4-mini, ComfyUI
+- **AI Services**: Google Gemini 2.5 Flash Preview, ComfyUI
+- **WebSocket**: ws (실시간 통신)
+- **Cloud Storage**: AWS S3 (선택사항)
 
 ## 데이터 스키마
 
@@ -68,7 +71,7 @@
   photos: [String] (URLs),
   imagePrompt: String,
   generatedImage: String (URL),
-  artStyleId: String (default: 'realistic'),
+  artStyleId: String (default: 'makoto_shinkai'),
   mainCharacter: {
     personId: ObjectId (ref: 'Person'),
     name: String,
@@ -77,6 +80,7 @@
   promptLog: {
     finalPrompt: String,
     characterDescription: String,
+    sceneDescription: String,
     createdAt: Date (default: now)
   },
   timestamps: { createdAt, updatedAt }
@@ -96,10 +100,22 @@
   negativePrompt: String,
   loraFile: String (optional),
   loraStrength: Number (optional),
+  loraStrengthClip: Number (optional),
   steps: Number,
   cfg: Number,
   sampler: String,
-  scheduler: String
+  scheduler: String,
+  denoise: Number,
+  upscaleSteps: Number (optional),
+  upscaleCfg: Number (optional),
+  upscaleSampler: String (optional),
+  vaeFile: String,
+  clipFile: String (optional),
+  clipLayer: Number (optional),
+  hasLoRA: Boolean,
+  hasCLIPLoader: Boolean,
+  freeUSettings: Object (optional),
+  ipAdapterSettings: Object (optional)
 }
 ```
 
@@ -358,18 +374,114 @@ Response:
 
 ### 📔 일기 관리 (Diaries)
 
-#### 일기 작성
+#### 화풍 목록 조회 (NEW)
+```http
+GET /api/diaries/art-styles
+Authorization: Bearer {token}
+
+Response:
+[
+  {
+    "id": "makoto_shinkai",
+    "name": "신카이 마코토",
+    "displayName": "Makoto Shinkai",
+    "description": "신카이 마코토 스타일의 아름답고 감성적인 화풍",
+    "workflowFile": "Makoto Shinkai workflow.json",
+    "requiredKeywords": ["shinkai makoto", "kimi no na wa.", "tenki no ko", "kotonoha no niwa"],
+    "hasLoRA": true,
+    "hasCLIPLoader": true
+  },
+  {
+    "id": "esthetic_80s",
+    "name": "에스테틱 80년대",
+    "displayName": "Esthetic 80s",
+    "description": "80년대 레트로 아메리칸 스타일의 감성적인 화풍",
+    "workflowFile": "Esthetic 80s workflow.json",
+    "requiredKeywords": ["1980s (style)"],
+    "hasLoRA": true,
+    "hasCLIPLoader": true
+  },
+  {
+    "id": "3d_character",
+    "name": "3D 캐릭터",
+    "displayName": "3D Character",
+    "description": "귀여운 3D 캐릭터 스타일의 치비 화풍",
+    "workflowFile": "_3d character style.json",
+    "requiredKeywords": ["chibi"],
+    "hasLoRA": true,
+    "hasCLIPLoader": true
+  },
+  {
+    "id": "minimalist_line",
+    "name": "미니멀 라인",
+    "displayName": "Minimalist Line",
+    "description": "깔끔하고 심플한 라인 아트 스타일",
+    "workflowFile": "Minimalist Line workflow.json",
+    "requiredKeywords": ["minimalist", "line art", "simple"],
+    "hasLoRA": true,
+    "hasCLIPLoader": true
+  },
+  {
+    "id": "disney_pixar",
+    "name": "디즈니 픽사",
+    "displayName": "Disney Pixar",
+    "description": "디즈니 픽사 스타일의 3D 애니메이션 화풍",
+    "workflowFile": "Disney Pixar workflow.json",
+    "requiredKeywords": ["disney pixar style", "3d animation", "cartoon"],
+    "hasLoRA": false,
+    "hasCLIPLoader": false,
+    "freeUSettings": {
+      "b1": 1.3,
+      "b2": 1.4,
+      "s1": 0.9,
+      "s2": 0.2
+    }
+  }
+]
+```
+
+#### 장면 묘사 생성 (NEW)
+```http
+POST /api/diaries/generate-scene
+Authorization: Bearer {token}
+Content-Type: application/json
+
+Body:
+{
+  "content": "string (required) - 일기 내용",
+  "protagonistName": "string (optional) - 주인공 이름",
+  "sceneDirectionHint": "string (optional) - 장면 연출 힌트"
+}
+
+Response:
+{
+  "diaryContent": "string - 원본 일기 내용",
+  "sceneDescription": "string - 생성된 장면 묘사",
+  "protagonistInfo": {
+    "personId": "string (optional) - 연락처에 있는 경우",
+    "name": "string - 주인공 이름",
+    "gender": "string (optional) - 성별",
+    "photo": "string (optional) - 프로필 사진",
+    "isFromContacts": "boolean - 연락처 등록 여부"
+  },
+  "extractedProtagonist": "string - 추출된 주인공 이름"
+}
+```
+
+#### 일기 작성 (두 단계 프로세스)
 ```http
 POST /api/diaries
 Authorization: Bearer {token}
 Content-Type: multipart/form-data
 
 Body:
-- content: string (required)
-- diaryDate: date (optional)
-- artStyleId: string (required)
-- mainCharacter: JSON string (optional) - 새 주인공 정보 {gender, hairStyle, clothing, accessories}
-- photos: file[] (optional, max: 5)
+- content: string (required) - 일기 내용
+- diaryDate: date (optional) - 일기 날짜
+- artStyleId: string (required) - 화풍 ID
+- sceneDescription: string (required) - 장면 묘사 (generate-scene에서 받은 값)
+- userAppearanceKeywords: string (optional) - 사용자 외모 키워드
+- mainCharacterGender: string (optional) - 새 주인공의 성별 (연락처에 없는 경우)
+- photos: file[] (optional, max: 5) - 첨부 사진
 
 Response:
 {
@@ -390,10 +502,26 @@ Response:
     "promptLog": {
       "finalPrompt": "string",
       "characterDescription": "string",
+      "sceneDescription": "string",
       "createdAt": "date"
     }
   },
   "imageGenerated": boolean
+}
+
+Error Response (새 주인공 정보 필요):
+{
+  "message": "새로운 인물 \"이름\"이 지정되었습니다. 성별을 선택해주세요.",
+  "requiresCharacterInfo": true,
+  "mainCharacterName": "string",
+  "requiredFields": ["gender"]
+}
+
+Error Response (주인공 사진 필요):
+{
+  "message": "새로운 인물 \"이름\"의 사진을 업로드해주세요.",
+  "requiresPhoto": true,
+  "mainCharacterName": "string"
 }
 ```
 
@@ -492,6 +620,7 @@ Response:
   "promptLog": {
     "finalPrompt": "string",
     "characterDescription": "string",
+    "sceneDescription": "string",
     "createdAt": "date"
   },
   "artStyle": {
@@ -548,6 +677,7 @@ Response:
   "promptLog": {
     "finalPrompt": "string",
     "characterDescription": "string",
+    "sceneDescription": "string",
     "createdAt": "date"
   },
   "artStyle": {
@@ -609,16 +739,25 @@ Response:
 
 ## 외부 서비스 연동
 
-### OpenAI API
-- **모델**: o4-mini
-- **용도**: 일기 내용 기반 이미지 프롬프트 생성
-- **함수**: `generateImagePrompt(diaryContent, characterDescription)`
+### Google Gemini AI
+- **모델**: gemini-2.5-flash-preview-05-20
+- **용도**: 장면 묘사 생성, 이미지 프롬프트 생성, 주인공 이름 추출
+- **특징**: Thinking Config (24,576 토큰), Streaming 응답
+- **함수**: 
+  - `generateSceneDescription(diaryContent, protagonistName, sceneHint)`
+  - `generateImagePrompt(sceneDescription, diaryContent, gender, userAppearanceKeywords, mandatoryKeywords)`
+  - `generateProtagonistName(diaryContent)`
 
 ### ComfyUI API
 - **URL**: `http://127.0.0.1:8188` (기본값)
 - **용도**: AI 이미지 생성
-- **워크플로우**: Makoto Shinkai style, Realistic style
-- **함수**: `runOriginalWorkflow(workflowPath, prompt, imageName)`
+- **워크플로우**: 5가지 화풍 지원 (Makoto Shinkai, Esthetic 80s, 3D Character, Minimalist Line, Disney Pixar)
+- **특징**: 범용 워크플로우 시스템, Anything Everywhere 자동 복구
+- **함수**: `processUniversalWorkflow(workflowFile, positivePrompt, negativePrompt, imageFile)`
+
+### AWS S3 (선택사항)
+- **용도**: 클라우드 파일 저장소
+- **함수**: `uploadToS3(file, bucketName, key)`
 
 ## 함수 명세
 
@@ -648,7 +787,9 @@ Response:
 
 | 함수명 | 입력 | 출력 | 설명 |
 |--------|------|------|------|
-| `createDiary` | `{ userId, content, diaryDate, artStyleId, photos }` | `{ diary, imageGenerated }` | 일기 작성 |
+| `getAllArtStylesAPI` | - | `[artStyle]` | 화풍 목록 조회 |
+| `generateSceneDescriptionAPI` | `{ content, protagonistName, sceneDirectionHint }` | `{ sceneDescription, protagonistInfo }` | 장면 묘사 생성 |
+| `createDiary` | `{ userId, content, sceneDescription, artStyleId, userAppearanceKeywords, photos }` | `{ diary, imageGenerated }` | 일기 작성 |
 | `getDiaries` | `{ userId, page, limit }` | `{ diaries, pagination }` | 일기 목록 조회 |
 | `getDiariesByMonth` | `{ userId, year, month }` | `[monthlyDiary]` | 월별 일기 조회 |
 | `getDiaryById` | `{ userId, diaryId }` | `diary` | 특정 일기 조회 |
@@ -661,9 +802,11 @@ Response:
 
 | 함수명 | 입력 | 출력 | 설명 |
 |--------|------|------|------|
-| `generateImageForDiary` | `{ diary, user, artStyle }` | `{ success, photoUrl, prompt, promptLog }` | 일기용 이미지 생성 |
-| `generateImagePrompt` | `{ diaryContent, characterDescription }` | `string` | OpenAI로 프롬프트 생성 |
-| `runOriginalWorkflow` | `{ workflowPath, prompt, imageName }` | `{ success, imageData, imageUrl }` | ComfyUI 워크플로우 실행 |
+| `generateImageForDiary` | `{ diary, user, artStyle, sceneDescription, userAppearanceKeywords }` | `{ success, photoUrl, prompt, promptLog }` | 일기용 이미지 생성 |
+| `generateSceneDescription` | `{ diaryContent, protagonistName, sceneHint }` | `string` | Gemini로 장면 묘사 생성 |
+| `generateImagePrompt` | `{ sceneDescription, diaryContent, gender, userAppearanceKeywords, mandatoryKeywords }` | `string` | Gemini로 이미지 프롬프트 생성 |
+| `generateProtagonistName` | `diaryContent` | `string` | Gemini로 주인공 이름 추출 |
+| `processUniversalWorkflow` | `{ workflowFile, positivePrompt, negativePrompt, imageFile }` | `{ success, imageData, imageUrl }` | ComfyUI 워크플로우 실행 |
 
 ### 유틸리티 함수
 
@@ -672,6 +815,7 @@ Response:
 | `generateToken` | `userId` | `string` | JWT 토큰 생성 |
 | `getArtStyleById` | `artStyleId` | `artStyle` | 화풍 정보 조회 |
 | `getDefaultArtStyle` | - | `artStyle` | 기본 화풍 조회 |
+| `getAllArtStyles` | - | `[artStyle]` | 모든 화풍 목록 조회 |
 | `removeKoreanParticles` | `string` | `string` | 한국어 조사 제거 |
 
 ## 시스템 아키텍처
@@ -691,35 +835,36 @@ Response:
 - **JWT 미들웨어**: 사용자 인증 및 권한 관리
 - **Multer 미들웨어**: 파일 업로드 처리
 - **CORS 미들웨어**: 크로스 오리진 요청 처리
+- **WebSocket**: 실시간 통신 지원
 
 #### 3. 비즈니스 로직 계층
 - **사용자 관리**: 회원가입, 로그인, 프로필 관리
 - **일기 관리**: CRUD 작업, 검색, 페이지네이션
 - **인물 관리**: 인물 정보 저장 및 관리
-- **AI 이미지 생성**: 프롬프트 생성 및 이미지 생성 로직
+- **AI 이미지 생성**: 두 단계 프로세스 (장면 묘사 → 이미지 생성)
 
 #### 4. 데이터 저장 계층
 - **MongoDB**: 사용자, 일기, 인물 데이터 저장
 - **로컬 파일 시스템**: 업로드된 이미지 파일 저장 (/uploads)
+- **AWS S3**: 클라우드 파일 저장소 (선택사항)
 
 #### 5. 외부 서비스 계층
-- **OpenAI API**: o4-mini 모델을 통한 이미지 프롬프트 생성
+- **Google Gemini AI**: 장면 묘사 및 이미지 프롬프트 생성
 - **ComfyUI**: AI 이미지 생성 워크플로우 실행
-- **AWS S3** (선택사항): 클라우드 파일 저장소
 
 ### 데이터 플로우
 
-1. **일기 작성 플로우**:
-   - 사용자가 일기 내용 입력 → Express 서버 → MongoDB 저장
-   - @태그 감지 → 인물 정보 조회 → OpenAI 프롬프트 생성
-   - ComfyUI 이미지 생성 → 로컬 저장 → 일기 업데이트
+1. **두 단계 일기 작성 플로우**:
+   - **1단계**: 사용자가 일기 내용 입력 → Gemini AI로 장면 묘사 생성
+   - **2단계**: 장면 묘사 + 외모 키워드 → Gemini AI로 프롬프트 생성 → ComfyUI 이미지 생성
+   - 생성된 이미지와 함께 일기 저장
 
 2. **인증 플로우**:
    - 로그인 요청 → 사용자 검증 → JWT 토큰 생성 → 클라이언트 저장
    - API 요청 시 JWT 토큰 검증 → 권한 확인 → 요청 처리
 
 3. **파일 업로드 플로우**:
-   - 파일 선택 → Multer 처리 → 로컬 저장 → URL 반환
+   - 파일 선택 → Multer 처리 → 로컬/S3 저장 → URL 반환
    - 프로필 사진/인물 사진 → 데이터베이스 URL 저장
 
 ### 보안 고려사항
@@ -729,7 +874,6 @@ Response:
 - **파일 검증**: 업로드 파일 타입 및 크기 제한
 - **CORS 설정**: 허용된 도메인에서만 API 접근 가능
 - **환경 변수**: 민감한 정보는 .env 파일로 관리
-
 
 ## 에러 코드
 
@@ -752,11 +896,17 @@ MONGO_URI=mongodb://localhost:27017/diary-app
 # JWT
 JWT_SECRET=your_jwt_secret
 
-# OpenAI
-OPENAI_API_KEY=your_openai_api_key
+# Google Gemini AI
+GEMINI_API_KEY=your_gemini_api_key
 
 # ComfyUI
 COMFY_SERVER_URL=http://127.0.0.1:8188
+
+# AWS S3 (선택사항)
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+AWS_REGION=your_aws_region
+AWS_BUCKET_NAME=your_bucket_name
 
 # 서버
 PORT=5000
@@ -764,33 +914,79 @@ PORT=5000
 
 ## 화풍 스타일
 
-현재 지원되는 화풍 스타일:
+현재 지원되는 5가지 화풍 스타일:
 
-
-### makoto_shinkai
+### 1. makoto_shinkai
 - **이름**: 신카이 마코토
 - **설명**: 신카이 마코토 스타일의 아름답고 감성적인 화풍
 - **워크플로우**: Makoto Shinkai workflow.json
-- **LoRA**: Makoto Shinkai.safetensors (강도: 1.0)
+- **LoRA**: Makoto Shinkai.safetensors (강도: 1.2)
+- **필수 키워드**: ["shinkai makoto", "kimi no na wa.", "tenki no ko", "kotonoha no niwa"]
 
+### 2. esthetic_80s
+- **이름**: 에스테틱 80년대
+- **설명**: 80년대 레트로 아메리칸 스타일의 감성적인 화풍
+- **워크플로우**: Esthetic 80s workflow.json
+- **LoRA**: Esthetic 80s.safetensors (강도: 1.0)
+- **필수 키워드**: ["1980s (style)"]
+
+### 3. 3d_character
+- **이름**: 3D 캐릭터
+- **설명**: 귀여운 3D 캐릭터 스타일의 치비 화풍
+- **워크플로우**: _3d character style.json
+- **LoRA**: blindbox_v1_mix.safetensors (강도: 0.8)
+- **필수 키워드**: ["chibi"]
+
+### 4. minimalist_line
+- **이름**: 미니멀 라인
+- **설명**: 깔끔하고 심플한 라인 아트 스타일
+- **워크플로우**: Minimalist Line workflow.json
+- **LoRA**: Minimalist Line.safetensors (강도: 1.0)
+- **필수 키워드**: ["minimalist", "line art", "simple"]
+
+### 5. disney_pixar
+- **이름**: 디즈니 픽사
+- **설명**: 디즈니 픽사 스타일의 3D 애니메이션 화풍
+- **워크플로우**: Disney Pixar workflow.json
+- **LoRA**: 없음
+- **필수 키워드**: ["disney pixar style", "3d animation", "cartoon"]
+- **특수 설정**: FreeU, IPAdapter 사용
 
 ## 사용 예제
 
-### 일기 작성 예제
+### 두 단계 일기 작성 예제
+
+#### 1단계: 장면 묘사 생성
 ```javascript
-// @태그가 포함된 일기 작성
+const sceneResponse = await fetch('/api/diaries/generate-scene', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer ' + token,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    content: '@박재석과 카페에서 커피를 마셨다. 정말 즐거운 시간이었다.',
+    protagonistName: '박재석',
+    sceneDirectionHint: '따뜻한 오후의 카페'
+  })
+});
+
+const sceneData = await sceneResponse.json();
+```
+
+#### 2단계: 일기 작성 및 이미지 생성
+```javascript
 const formData = new FormData();
 formData.append('content', '@박재석과 카페에서 커피를 마셨다. 정말 즐거운 시간이었다.');
+formData.append('sceneDescription', sceneData.sceneDescription);
 formData.append('artStyleId', 'makoto_shinkai');
+formData.append('userAppearanceKeywords', '1man, short hair, casual clothing');
 
-// 새로운 주인공인 경우 추가 정보 필요
-formData.append('mainCharacter', JSON.stringify({
-  gender: '남성',
-  hairStyle: 'short hair',
-  clothing: 'casual clothes',
-  accessories: 'glasses'
-}));
-formData.append('photos', profilePhotoFile);
+// 새로운 주인공인 경우 성별 정보 필요
+if (!sceneData.protagonistInfo.isFromContacts) {
+  formData.append('mainCharacterGender', '남성');
+  formData.append('photos', profilePhotoFile); // 주인공 사진
+}
 
 const response = await fetch('/api/diaries', {
   method: 'POST',
@@ -799,6 +995,16 @@ const response = await fetch('/api/diaries', {
   },
   body: formData
 });
+```
+
+### 화풍 목록 조회 예제
+```javascript
+const response = await fetch('/api/diaries/art-styles', {
+  headers: {
+    'Authorization': 'Bearer ' + token
+  }
+});
+const artStyles = await response.json();
 ```
 
 ### 인물 검색 예제
@@ -813,5 +1019,5 @@ const people = await response.json();
 
 ---
 
-**최종 업데이트**: 2025년 6월 15일  
-**API 버전**: v2.0  
+**최종 업데이트**: 2025년 6월 17일  
+**API 버전**: v2.1  
