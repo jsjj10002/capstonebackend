@@ -133,6 +133,141 @@
         "weight": 1.0,
         "weight_faceidv2": 1.4
       }
+    },
+    {
+      "id": "animal_crossing",
+      "name": "동물의 숲",
+      "displayName": "Animal Crossing",
+      "description": "동물의 숲 스타일의 귀여운 치비 캐릭터 화풍",
+      "workflowFile": "Animal Crossing workflow.json",
+      "checkpointName": "anythingelseV4_v45.safetensors",
+      "requiredKeywords": ["(chibi:1.2)"],
+      "negativePrompt": "embedding:badhandv4, embedding:easynegative, text,username,logo,(low quality, worst quality:1.4), (bad anatomy), (inaccurate limb:1.2), bad composition, inaccurate eyes, extra digit, fewer digits, (extra arms:1.2)",
+      "loraFile": "Animal Crossing.safetensors",
+      "loraStrength": 1.0,
+      "loraStrengthClip": 1.0,
+      "steps": 30,
+      "cfg": 8,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 0.5,
+      "upscaleSteps": 20,
+      "upscaleCfg": 8,
+      "upscaleSampler": "dpmpp_2m",
+      "vaeFile": "orangemix.vae.pt",
+      "clipFile": "ViT-L-14-BEST-smooth-GmP-HF-format.safetensors",
+      "clipLayer": -2,
+      "hasLoRA": true,
+      "hasCLIPLoader": true,
+      "freeUSettings": {
+        "b1": 1.3,
+        "b2": 1.4,
+        "s1": 0.9,
+        "s2": 0.2
+      },
+      "ipAdapterSettings": {
+        "preset": "FACEID PLUS V2",
+        "lora_strength": 0.6,
+        "weight": 1.0,
+        "weight_faceidv2": 1.7
+      },
+      "detailDaemonSettings": {
+        "detail_amount": 0.1,
+        "start": 0.2,
+        "end": 0.8,
+        "bias": 0.5,
+        "exponent": 1
+      }
+    },
+    {
+      "id": "rhythm_heaven",
+      "name": "리듬 헤븐",
+      "displayName": "Rhythm Heaven",
+      "description": "리듬 헤븐 스타일의 독특하고 개성있는 화풍",
+      "workflowFile": "Rhythm Heaven workflow.json",
+      "checkpointName": "anyloraCheckpoint_bakedvaeBlessedFp16.safetensors",
+      "requiredKeywords": [],
+      "negativePrompt": "embedding:badhandv4, (worst quality, low quality:1.4)",
+      "loraFile": "Rhythm Heaven.safetensors",
+      "loraStrength": 1.0,
+      "loraStrengthClip": 1.0,
+      "steps": 30,
+      "cfg": 9,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 0.5,
+      "upscaleSteps": 20,
+      "upscaleCfg": 9,
+      "upscaleSampler": "dpmpp_2m",
+      "vaeFile": "orangemix.vae.pt",
+      "clipFile": "ViT-L-14-BEST-smooth-GmP-HF-format.safetensors",
+      "clipLayer": -2,
+      "hasLoRA": true,
+      "hasCLIPLoader": true,
+      "freeUSettings": {
+        "b1": 1.3,
+        "b2": 1.4,
+        "s1": 0.9,
+        "s2": 0.2
+      },
+      "ipAdapterSettings": {
+        "preset": "FACEID PLUS V2",
+        "lora_strength": 0.6,
+        "weight": 1.0,
+        "weight_faceidv2": 1.6
+      },
+      "detailDaemonSettings": {
+        "detail_amount": 0.1,
+        "start": 0.2,
+        "end": 0.8,
+        "bias": 0.5,
+        "exponent": 1
+      }
+    },
+    {
+      "id": "studio_ghibli",
+      "name": "스튜디오 지브리",
+      "displayName": "Studio Ghibli",
+      "description": "스튜디오 지브리 스타일의 아름답고 환상적인 애니메이션 화풍",
+      "workflowFile": "Studio Ghibli workflow.json",
+      "checkpointName": "Anything-v4.5-pruned-mergedVae.safetensors",
+      "requiredKeywords": ["ghibli style"],
+      "negativePrompt": "embedding:badhandv4, embedding:easynegative, (painting by bad-artist-anime:0.9), (painting by bad-artist:0.9), watermark, text, error, blurry, jpeg artifacts, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, artist name, (worst quality, low quality:1.4), bad anatomy",
+      "loraFile": "Studio Ghibli.safetensors",
+      "loraStrength": 1.0,
+      "loraStrengthClip": 1.0,
+      "steps": 30,
+      "cfg": 8,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 0.5,
+      "upscaleSteps": 20,
+      "upscaleCfg": 8,
+      "upscaleSampler": "dpmpp_2m",
+      "vaeFile": "orangemix.vae.pt",
+      "clipFile": "ViT-L-14-BEST-smooth-GmP-HF-format.safetensors",
+      "clipLayer": -2,
+      "hasLoRA": true,
+      "hasCLIPLoader": true,
+      "freeUSettings": {
+        "b1": 1.3,
+        "b2": 1.4,
+        "s1": 0.9,
+        "s2": 0.2
+      },
+      "ipAdapterSettings": {
+        "preset": "FACEID PLUS V2",
+        "lora_strength": 0.6,
+        "weight": 1.0,
+        "weight_faceidv2": 1.6
+      },
+      "detailDaemonSettings": {
+        "detail_amount": 0.1,
+        "start": 0.2,
+        "end": 0.8,
+        "bias": 0.5,
+        "exponent": 1
+      }
     }
   ]
 }
