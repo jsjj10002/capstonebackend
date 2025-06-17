@@ -21,19 +21,6 @@ const personSchema = new mongoose.Schema(
       type: String, // 사진 URL
       required: [true, '사진은 필수입니다.'],
     },
-    // 외모 특징
-    hairStyle: {
-      type: String,
-      default: '', // 헤어스타일 자유 입력
-    },
-    clothing: {
-      type: String,
-      default: '', // 의상 자유 입력
-    },
-    accessories: {
-      type: String,
-      default: '', // 악세사리 자유 입력
-    },
     createdAt: {
       type: Date,
       default: Date.now,

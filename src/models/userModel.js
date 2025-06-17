@@ -41,20 +41,26 @@ const userSchema = new mongoose.Schema(
 
 // 비밀번호 해싱
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password')) {
+    return next();
+  }
   
   try {
     const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
+    const hashedPassword = await bcrypt.hash(this.password, salt);
+    
+    this.password = hashedPassword;
     next();
   } catch (error) {
+    console.error('비밀번호 해싱 오류:', error);
     next(error);
   }
 });
 
 // 비밀번호 검증 메소드
 userSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  const result = await bcrypt.compare(enteredPassword, this.password);
+  return result;
 };
 
 const User = mongoose.model('User', userSchema);

@@ -4,7 +4,6 @@ const { uploadToS3 } = require('../config/uploadConfig');
 const { analyzeImageFeatures } = require('../config/openaiConfig');
 const fs = require('fs');
 const path = require('path');
-const bcrypt = require('bcrypt');
 
 // 회원가입
 const registerUser = async (req, res) => {
@@ -28,12 +27,11 @@ const registerUser = async (req, res) => {
       profilePhoto = `/uploads/${req.file.filename}`;
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-    
+    // 비밀번호는 User 모델의 pre('save') 미들웨어에서 해싱되므로 여기서는 해싱하지 않음
     const userData = {
       username,
       email,
-      password: hashedPassword,
+      password, // 원본 비밀번호 전달 (모델에서 해싱됨)
       gender,
       profilePhoto,
     };
@@ -68,15 +66,21 @@ const loginUser = async (req, res) => {
     const user = await User.findOne({ email }).select('+password');
 
     // 사용자 존재 및 비밀번호 확인
-    if (user && (await user.matchPassword(password))) {
-      res.json({
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        profilePhoto: user.profilePhoto,
-        gender: user.gender,
-        token: generateToken(user._id),
-      });
+    if (user) {
+      const passwordMatch = await user.matchPassword(password);
+      
+      if (passwordMatch) {
+        res.json({
+          _id: user._id,
+          username: user.username,
+          email: user.email,
+          profilePhoto: user.profilePhoto,
+          gender: user.gender,
+          token: generateToken(user._id),
+        });
+      } else {
+        res.status(401).json({ message: '이메일 또는 비밀번호가 올바르지 않습니다.' });
+      }
     } else {
       res.status(401).json({ message: '이메일 또는 비밀번호가 올바르지 않습니다.' });
     }
