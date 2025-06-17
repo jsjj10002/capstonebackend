@@ -2,7 +2,7 @@
 
 **작성일**: 2025년 6월 17일  
 **버전**: v2.1  
-**AI 모델**: Google Gemini 2.5 Flash Preview  
+**AI 모델**: Google Gemini 2.5 Flash 모델  
 **작성자**: AI 개발팀
 
 ---
@@ -23,7 +23,7 @@
 
 ## 개요
 
-v2.1의 프롬프트 엔지니어링 시스템은 Google Gemini 2.5 Flash Preview 모델을 기반으로 구축된 고도로 정교한 3단계 AI 파이프라인입니다. 이 시스템은 일기 텍스트를 고품질 이미지로 변환하는 과정에서 최첨단 프롬프트 엔지니어링 기법을 활용합니다.
+v2.1의 프롬프트 엔지니어링 시스템은 Google Gemini 2.5 Flash 모델을 기반으로 구축된 고도로 정교한 3단계 AI 파이프라인입니다. 이 시스템은 일기 텍스트를 고품질 이미지로 변환하는 과정에서 최첨단 프롬프트 엔지니어링 기법을 활용합니다.
 
 ### 핵심 특징
 
@@ -40,13 +40,23 @@ v2.1의 프롬프트 엔지니어링 시스템은 Google Gemini 2.5 Flash Previe
 ### 1. 모델 사양
 
 ```javascript
-const model = 'gemini-2.5-flash-preview-05-20';
+const model = 'gemini-2.5-flash';
 
 const config = {
+  temperature: 0.85,
+  topP: 0.75,
   thinkingConfig: {
     thinkingBudget: 24576,  // 24K 토큰 예산
   },
-  responseMimeType: 'text/plain',
+  responseMimeType: 'application/json',
+  responseSchema: {
+    type: Type.OBJECT,
+    required: ["TEXT", "PERSON"],
+    properties: {
+      TEXT: { type: Type.STRING },
+      PERSON: { type: Type.STRING }
+    }
+  },
   systemInstruction: [...]
 };
 ```

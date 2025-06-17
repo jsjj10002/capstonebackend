@@ -28,7 +28,7 @@ const protect = async (req, res, next) => {
   }
 
   if (!token) {
-    res.status(401).json({ message: '인증에 실패했습니다. 토큰이 없습니다.' });
+    return res.status(401).json({ message: '인증에 실패했습니다. 토큰이 없습니다.' });
   }
 };
 

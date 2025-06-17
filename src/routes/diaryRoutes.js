@@ -10,6 +10,7 @@ const {
   searchDiaries,
   getDiaryPromptLog,
   generateSceneDescriptionAPI,
+  selectMainCharacterAPI,
   getAllArtStylesAPI,
 } = require('../controllers/diaryController');
 const { protect } = require('../middleware/authMiddleware');
@@ -21,8 +22,11 @@ router.use(protect);
 // 화풍 목록 조회 라우트
 router.get('/art-styles', getAllArtStylesAPI);
 
-// 장면 묘사 생성 라우트 (일기 작성 전 단계)
+// 장면 묘사 생성 라우트
 router.post('/generate-scene', generateSceneDescriptionAPI);
+
+// 주요 인물 선택 및 태그 업데이트 라우트
+router.post('/select-character', selectMainCharacterAPI);
 
 // 일기 작성 라우트
 router.post('/', uploadLocal.array('photos', 5), createDiary);

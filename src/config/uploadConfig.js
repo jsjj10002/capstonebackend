@@ -28,18 +28,41 @@ const storage = multer.diskStorage({
   },
 });
 
-// 파일 필터링
+// 파일 필터링 - 보안 강화
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif/;
-  const isValidFileType = allowedTypes.test(
-    path.extname(file.originalname).toLowerCase()
-  );
+  // 허용된 MIME 타입 검증
+  const allowedMimeTypes = [
+    'image/jpeg',
+    'image/jpg', 
+    'image/png',
+    'image/gif'
+  ];
   
-  if (isValidFileType) {
-    return cb(null, true);
-  } else {
-    cb(new Error('지원되지 않는 파일 형식입니다. (jpeg, jpg, png, gif만 허용)'));
+  // 허용된 확장자 검증
+  const allowedExtensions = /\.(jpeg|jpg|png|gif)$/i;
+  
+  // 파일명 검증 (경로 조작 공격 방지)
+  const fileName = file.originalname.toLowerCase();
+  if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+    return cb(new Error('유효하지 않은 파일명입니다.'));
   }
+  
+  // MIME 타입 검증
+  if (!allowedMimeTypes.includes(file.mimetype)) {
+    return cb(new Error(`지원되지 않는 MIME 타입입니다. (${allowedMimeTypes.join(', ')}만 허용)`));
+  }
+  
+  // 확장자 검증
+  if (!allowedExtensions.test(fileName)) {
+    return cb(new Error('지원되지 않는 파일 확장자입니다. (jpeg, jpg, png, gif만 허용)'));
+  }
+  
+  // 파일 크기 추가 검증 (5MB)
+  if (file.size && file.size > 5 * 1024 * 1024) {
+    return cb(new Error('파일 크기는 5MB를 초과할 수 없습니다.'));
+  }
+  
+  cb(null, true);
 };
 
 // S3 설정
