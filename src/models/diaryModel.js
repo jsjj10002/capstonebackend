@@ -12,6 +12,10 @@ const diarySchema = new mongoose.Schema({
   photos: [{
     type: String,
   }],
+  sceneDescription: {
+    type: String,
+    default: null,
+  },
   imagePrompt: {
     type: String,
   },
@@ -20,7 +24,7 @@ const diarySchema = new mongoose.Schema({
   },
   artStyleId: {
     type: String,
-    default: 'realistic',
+    default: 'makoto_shinkai',
   },
   mainCharacter: {
     personId: {
@@ -37,12 +41,13 @@ const diarySchema = new mongoose.Schema({
       default: false,
     },
   },
-  // 단순화된 프롬프트 로그
+  // 단순화된 프롬프트 로그 - 두 단계 프로세스 반영
   promptLog: {
+    sceneDescription: String,
     finalPrompt: String,
-    characterDescription: String,
-    requiredKeywords: [String], // 화풍별 필수 키워드 배열 추가
-    artStyleId: String, // 화풍 ID 추가
+    userAppearanceKeywords: String,
+    requiredKeywords: [String], // 화풍별 필수 키워드 배열
+    artStyleId: String, // 화풍 ID
     createdAt: { type: Date, default: Date.now },
   },
   userId: {

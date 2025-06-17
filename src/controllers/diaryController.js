@@ -1,9 +1,9 @@
 const Diary = require('../models/diaryModel');
 const User = require('../models/userModel');
 const Person = require('../models/personModel');
-const { getArtStyleById, getDefaultArtStyle } = require('../utils/artStyleManager');
+const { getArtStyleById, getDefaultArtStyle, getAllArtStyles } = require('../utils/artStyleManager');
 const { uploadToS3 } = require('../config/uploadConfig');
-const { analyzeDiaryContent, generateImagePrompt } = require('../config/openaiConfig');
+const { generateSceneDescription, generateImagePrompt } = require('../config/geminiConfig');
 const { customizeWorkflow, runComfyWorkflow, runOriginalWorkflow } = require('../config/comfyuiConfig');
 const fs = require('fs');
 const path = require('path');
@@ -35,10 +35,78 @@ const removeKoreanParticles = (name) => {
   return cleanName.trim();
 };
 
-// 새 일기 작성 (자동 이미지 생성 포함)
+// 장면 묘사 API 추가
+const generateSceneDescriptionAPI = async (req, res) => {
+  try {
+    const { content, protagonistName, sceneDirectionHint } = req.body;
+    
+    if (!content || content.trim() === '') {
+      return res.status(400).json({ message: '일기 내용을 입력해주세요.' });
+    }
+    
+    // @태그 추출
+    const atMentions = content.match(/@[^\s]+/g);
+    let extractedProtagonist = protagonistName;
+    
+    if (atMentions && atMentions.length > 0 && !protagonistName) {
+      const mainCharacterName = atMentions[0].substring(1);
+      extractedProtagonist = removeKoreanParticles(mainCharacterName);
+    }
+    
+    // 주인공 정보 조회
+    let protagonistInfo = null;
+    if (extractedProtagonist) {
+      const existingPerson = await Person.findOne({
+        user: req.user._id,
+        name: extractedProtagonist
+      });
+      
+      if (existingPerson) {
+        protagonistInfo = {
+          personId: existingPerson._id,
+          name: existingPerson.name,
+          gender: existingPerson.gender,
+          photo: existingPerson.photo,
+          isFromContacts: true
+        };
+      } else {
+        protagonistInfo = {
+          name: extractedProtagonist,
+          isFromContacts: false
+        };
+      }
+    }
+    
+    // 장면 묘사 생성
+    const sceneDescription = await generateSceneDescription(
+      content, 
+      extractedProtagonist, 
+      sceneDirectionHint
+    );
+    
+    res.json({
+      diaryContent: content,
+      sceneDescription: sceneDescription,
+      protagonistInfo: protagonistInfo,
+      extractedProtagonist: extractedProtagonist
+    });
+    
+  } catch (error) {
+    console.error('장면 묘사 생성 오류:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+};
+
+// 새 일기 작성 (자동 이미지 생성 포함) - 두 단계 프로세스 적용
 const createDiary = async (req, res) => {
   try {
-    const { content, diaryDate, artStyleId } = req.body;
+    const { 
+      content, 
+      diaryDate, 
+      artStyleId, 
+      sceneDescription, 
+      userAppearanceKeywords 
+    } = req.body;
     
     if (!content || content.trim() === '') {
       return res.status(400).json({ message: '일기 내용을 입력해주세요.' });
@@ -48,11 +116,24 @@ const createDiary = async (req, res) => {
       return res.status(400).json({ message: '화풍을 선택해주세요.' });
     }
     
+    if (!sceneDescription || sceneDescription.trim() === '') {
+      return res.status(400).json({ message: '장면 묘사가 필요합니다.' });
+    }
+    
     // @태그 추출 (조사 전처리는 스키마 미들웨어에서 처리)
     const atMentions = content.match(/@[^\s]+/g);
     let mainCharacterData = {};
     
+    console.log('=== 주인공 처리 디버깅 시작 ===');
+    console.log('일기 내용:', content);
+    console.log('atMentions:', atMentions);
+    console.log('req.body.mainCharacterPersonId:', req.body.mainCharacterPersonId);
+    console.log('req.body.mainCharacterName:', req.body.mainCharacterName);
+    console.log('req.body.mainCharacterGender:', req.body.mainCharacterGender);
+    console.log('req.body.protagonistName:', req.body.protagonistName);
+    
     if (atMentions && atMentions.length > 0) {
+      console.log('=== @태그가 있는 경우 처리 ===');
       const mainCharacterName = atMentions[0].substring(1);
       const cleanName = removeKoreanParticles(mainCharacterName); // 조사 제거
       
@@ -62,42 +143,48 @@ const createDiary = async (req, res) => {
       });
       
       if (existingPerson) {
+        // 기존 인물이 있는 경우
         mainCharacterData = {
           personId: existingPerson._id,
           name: existingPerson.name,
           isFromContacts: true
         };
       } else {
-        // 연락처에 없는 경우 - 주인공 정보가 필요
-        const mainCharacterInfo = req.body.mainCharacter;
-        if (!mainCharacterInfo || !mainCharacterInfo.gender || !mainCharacterInfo.hairStyle || !mainCharacterInfo.clothing) {
+        // 연락처에 없는 새로운 인물인 경우
+        const mainCharacterGender = req.body.mainCharacterGender;
+        
+        if (!mainCharacterGender) {
           return res.status(400).json({ 
-            message: '새로운 주인공이 지정되었습니다. 성별, 헤어스타일, 의상 정보를 입력해주세요.',
+            message: `새로운 인물 "${cleanName}"이 지정되었습니다. 성별을 선택해주세요.`,
             requiresCharacterInfo: true,
-            mainCharacterName: mainCharacterName
+            mainCharacterName: cleanName,
+            requiredFields: ['gender']
           });
         }
         
-        // 주인공 사진이 필요
-        if (!req.files || req.files.length === 0) {
+        // 주인공 사진이 필요한지 확인 (첫 번째 파일이 주인공 사진인지)
+        let characterPhotoPath = null;
+        if (req.files && req.files.length > 0) {
+          // 첫 번째 파일을 주인공 사진으로 사용
+          characterPhotoPath = `/uploads/${req.files[0].filename}`;
+        } else {
           return res.status(400).json({ 
-            message: '새로운 주인공의 사진을 업로드해주세요.',
+            message: `새로운 인물 "${cleanName}"의 사진을 업로드해주세요.`,
             requiresPhoto: true,
-            mainCharacterName: mainCharacterName
+            mainCharacterName: cleanName
           });
         }
         
         // 새 사람을 연락처에 자동 추가
         try {
           const newPerson = await Person.create({
-            name: mainCharacterName,
-            gender: mainCharacterInfo.gender,
-            hairStyle: mainCharacterInfo.hairStyle,
-            clothing: mainCharacterInfo.clothing,
-            accessories: mainCharacterInfo.accessories || '',
-            photo: `/uploads/${req.files[0].filename}`,
+            name: cleanName,
+            gender: mainCharacterGender,
+            photo: characterPhotoPath,
             user: req.user._id,
           });
+          
+          console.log(`새로운 인물 자동 추가: ${cleanName} (${mainCharacterGender})`);
           
           mainCharacterData = {
             personId: newPerson._id,
@@ -109,11 +196,176 @@ const createDiary = async (req, res) => {
           return res.status(500).json({ message: '주인공 정보 저장에 실패했습니다.' });
         }
       }
-    
-    
-    // 화풍 정보 가져오기
+    } else {
+      console.log('=== @태그가 없는 경우 처리 ===');
+      // @태그가 없는 경우 처리
+      const mainCharacterPersonId = req.body.mainCharacterPersonId; // 기존 인물 선택
+      let mainCharacterName = req.body.mainCharacterName; // 사용자가 직접 입력한 이름
+      const mainCharacterGender = req.body.mainCharacterGender; // 새 인물 성별
+      
+      // mainCharacterName이 없으면 protagonistName에서 가져오기 (장면 묘사에서 추출된 이름)
+      if (!mainCharacterName && req.body.protagonistName) {
+        mainCharacterName = req.body.protagonistName;
+        console.log(`장면 묘사에서 추출된 주인공 이름 사용: ${mainCharacterName}`);
+      }
+      
+      console.log('최종 mainCharacterName:', mainCharacterName);
+      console.log('최종 mainCharacterPersonId:', mainCharacterPersonId);
+      console.log('최종 mainCharacterGender:', mainCharacterGender);
+      
+      if (mainCharacterPersonId) {
+        // 기존 인물 리스트에서 선택한 경우
+        const existingPerson = await Person.findOne({
+          _id: mainCharacterPersonId,
+          user: req.user._id
+        });
+        
+        if (existingPerson) {
+          mainCharacterData = {
+            personId: existingPerson._id,
+            name: existingPerson.name,
+            isFromContacts: true
+          };
+          console.log(`기존 인물 선택: ${existingPerson.name}`);
+        } else {
+          console.warn('선택된 인물을 찾을 수 없습니다.');
+        }
+      } else if (mainCharacterName && mainCharacterGender && req.files && req.files.length > 0) {
+        // 사용자가 직접 입력한 이름으로 새 인물 생성
+        const cleanName = removeKoreanParticles(mainCharacterName.trim());
+        const characterPhotoPath = `/uploads/${req.files[0].filename}`;
+        
+        // 같은 이름의 인물이 이미 있는지 확인
+        const existingPerson = await Person.findOne({
+          user: req.user._id,
+          name: cleanName
+        });
+        
+        if (existingPerson) {
+          // 이미 존재하는 경우 기존 인물 사용
+          mainCharacterData = {
+            personId: existingPerson._id,
+            name: existingPerson.name,
+            isFromContacts: true
+          };
+          console.log(`기존 인물 사용: ${existingPerson.name}`);
+        } else {
+          // 새로운 인물 생성
+          try {
+            const newPerson = await Person.create({
+              name: cleanName,
+              gender: mainCharacterGender,
+              photo: characterPhotoPath,
+              user: req.user._id,
+            });
+            
+            console.log(`새로운 인물 자동 추가: ${cleanName} (${mainCharacterGender})`);
+            
+            mainCharacterData = {
+              personId: newPerson._id,
+              name: newPerson.name,
+              isFromContacts: true
+            };
+          } catch (error) {
+            console.error('새 인물 자동 추가 오류:', error);
+            return res.status(500).json({ message: '주인공 정보 저장에 실패했습니다.' });
+          }
+        }
+      } else if (mainCharacterGender && req.files && req.files.length > 0) {
+        // 이름 없이 성별만 있는 경우 - 일기 내용에서 이름 추출 시도
+        const { generateProtagonistName } = require('../config/geminiConfig');
+        
+        try {
+          console.log('일기 내용에서 주인공 이름 추출 시도...');
+          const extractedName = await generateProtagonistName(content);
+          
+          if (extractedName && extractedName.trim() !== '') {
+            const cleanName = removeKoreanParticles(extractedName.trim());
+            console.log(`일기 내용에서 주인공 이름 추출: ${cleanName}`);
+            
+            // 같은 이름의 인물이 이미 있는지 확인
+            const existingPerson = await Person.findOne({
+              user: req.user._id,
+              name: cleanName
+            });
+            
+            if (existingPerson) {
+              // 이미 존재하는 경우 기존 인물 사용
+              mainCharacterData = {
+                personId: existingPerson._id,
+                name: existingPerson.name,
+                isFromContacts: true
+              };
+              console.log(`기존 인물 사용: ${existingPerson.name}`);
+            } else {
+              // 새로운 인물 생성
+              const characterPhotoPath = `/uploads/${req.files[0].filename}`;
+              const newPerson = await Person.create({
+                name: cleanName,
+                gender: mainCharacterGender,
+                photo: characterPhotoPath,
+                user: req.user._id,
+              });
+              
+              console.log(`새로운 인물 자동 추가: ${cleanName} (${mainCharacterGender})`);
+              
+              mainCharacterData = {
+                personId: newPerson._id,
+                name: newPerson.name,
+                isFromContacts: true
+              };
+            }
+          } else {
+            // 이름 추출 실패 시 익명 주인공 생성
+            console.log('이름 추출 실패, 익명 주인공 생성');
+            const anonymousName = `익명_${Date.now()}`;
+            const characterPhotoPath = `/uploads/${req.files[0].filename}`;
+            
+            const newPerson = await Person.create({
+              name: anonymousName,
+              gender: mainCharacterGender,
+              photo: characterPhotoPath,
+              user: req.user._id,
+            });
+            
+            console.log(`익명 주인공 자동 추가: ${anonymousName} (${mainCharacterGender})`);
+            
+            mainCharacterData = {
+              personId: newPerson._id,
+              name: newPerson.name,
+              isFromContacts: true
+            };
+          }
+        } catch (error) {
+          console.error('주인공 처리 오류:', error);
+          // 오류 발생 시 익명 주인공 생성
+          const anonymousName = `익명_${Date.now()}`;
+          const characterPhotoPath = `/uploads/${req.files[0].filename}`;
+          
+          try {
+            const newPerson = await Person.create({
+              name: anonymousName,
+              gender: mainCharacterGender,
+              photo: characterPhotoPath,
+              user: req.user._id,
+            });
+            
+            console.log(`오류 후 익명 주인공 자동 추가: ${anonymousName} (${mainCharacterGender})`);
+            
+            mainCharacterData = {
+              personId: newPerson._id,
+              name: newPerson.name,
+              isFromContacts: true
+            };
+          } catch (fallbackError) {
+            console.error('익명 주인공 생성도 실패:', fallbackError);
+            // 최종 실패해도 일기는 계속 작성
+          }
+        }
+      }
     }
     
+    // 화풍 정보 가져오기
     const artStyle = getArtStyleById(artStyleId);
     if (!artStyle) {
       return res.status(400).json({ message: '유효하지 않은 화풍입니다.' });
@@ -126,31 +378,74 @@ const createDiary = async (req, res) => {
       diaryDate: diaryDate ? new Date(diaryDate) : new Date(),
       photos: [],
       artStyleId: artStyle.id,
-      mainCharacter: mainCharacterData
+      mainCharacter: mainCharacterData,
+      sceneDescription: sceneDescription // 장면 묘사 추가
     };
     
-    // 사진 처리...
-    
-    // AI 분석 부분 완전 제거 (태그, 무드 분석 없음)
+    // 사진 처리 (첫 번째 파일이 주인공 사진인 경우 제외)
+    if (req.files && req.files.length > 0) {
+      let startIndex = 0;
+      
+      // 새로운 주인공이 추가된 경우 첫 번째 파일은 주인공 사진이므로 제외
+      if (atMentions && atMentions.length > 0) {
+        const mainCharacterName = atMentions[0].substring(1);
+        const cleanName = removeKoreanParticles(mainCharacterName);
+        
+        const existingPerson = await Person.findOne({
+          user: req.user._id,
+          name: cleanName
+        });
+        
+        if (!existingPerson && req.body.mainCharacterGender) {
+          // 새로운 주인공이 추가된 경우 첫 번째 파일 제외
+          startIndex = 1;
+        }
+      } else {
+        // @태그가 없지만 새로운 주인공이 생성된 경우도 첫 번째 파일 제외
+        const mainCharacterName = req.body.mainCharacterName;
+        const mainCharacterGender = req.body.mainCharacterGender;
+        
+        if ((mainCharacterName && mainCharacterGender) || (!req.body.mainCharacterPersonId && mainCharacterGender)) {
+          // 사용자가 직접 이름을 입력했거나 익명 주인공인 경우
+          startIndex = 1;
+        }
+      }
+      
+      // 일기 사진들만 추가
+      for (let i = startIndex; i < req.files.length; i++) {
+        diaryData.photos.push(`/uploads/${req.files[i].filename}`);
+      }
+    }
     
     const diary = await Diary.create(diaryData);
+    console.log(`일기 생성 완료: ${diary._id}`);
+    console.log(`일기 주인공 정보:`, diary.mainCharacter);
     
-    // 이미지 생성
+    // 이미지 생성 (실패해도 일기는 유지)
     try {
-      const imageResult = await generateImageForDiary(diary, req.user, artStyle);
+      const imageResult = await generateImageForDiary(
+        diary, 
+        req.user, 
+        artStyle, 
+        sceneDescription, 
+        userAppearanceKeywords
+      );
       
       if (imageResult.success) {
         diary.generatedImage = imageResult.photoUrl;
         diary.imagePrompt = imageResult.prompt;
         diary.promptLog = imageResult.promptLog;
         await diary.save();
+        console.log(`이미지 생성 성공: ${diary.generatedImage}`);
+      } else {
+        console.warn(`이미지 생성 실패하지만 일기는 저장됨: ${imageResult.error}`);
       }
     } catch (error) {
-      console.error('이미지 자동 생성 오류:', error);
+      console.error('이미지 자동 생성 오류 (일기는 저장됨):', error);
     }
     
     const populatedDiary = await Diary.findById(diary._id)
-      .populate('mainCharacter.personId', 'name photo gender hairStyle clothing accessories');
+      .populate('mainCharacter.personId', 'name photo gender');
     
     res.status(201).json({
       message: '일기가 작성되었습니다.',
@@ -163,53 +458,39 @@ const createDiary = async (req, res) => {
   }
 };
 
-// 일기용 이미지 생성 함수 (내부 사용)
-const generateImageForDiary = async (diary, user, artStyle) => {
+// 일기용 이미지 생성 함수 (내부 사용) - 두 단계 프로세스 적용
+const generateImageForDiary = async (diary, user, artStyle, sceneDescription, userAppearanceKeywords = '') => {
   try {
     let characterPhoto = null;
-    let characterDescription = '';
+    let characterGender = '';
+    
+    console.log('=== 이미지 생성 함수 주인공 정보 확인 ===');
+    console.log('diary.mainCharacter:', diary.mainCharacter);
+    console.log('diary.mainCharacter.personId:', diary.mainCharacter?.personId);
+    console.log('diary.mainCharacter.name:', diary.mainCharacter?.name);
     
     // 주인공이 있는 경우
-    if (diary.mainCharacter && diary.mainCharacter.name && diary.mainCharacter.personId) {
+    if (diary.mainCharacter && diary.mainCharacter.personId) {
+      console.log('주인공 정보 조회 시작...');
       const person = await Person.findById(diary.mainCharacter.personId);
+      console.log('조회된 Person 객체:', person);
+      
       if (person && person.photo) {
         characterPhoto = path.join(__dirname, '..', '..', person.photo);
-        
-        // 단순한 특징 문자열 생성
-        const characteristics = [];
-        
-        // 성별 (한국어 그대로 전달)
-        if (person.gender) {
-          characteristics.push(person.gender); // '남성', '여성', '기타' 그대로
-        }
-        
-        // 헤어스타일
-        if (person.hairStyle) {
-          characteristics.push(person.hairStyle);
-        }
-        
-        // 의상
-        if (person.clothing) {
-          characteristics.push(person.clothing);
-        }
-        
-        // 액세서리
-        if (person.accessories) {
-          characteristics.push(person.accessories);
-        }
-        
-        characterDescription = characteristics.join(', ');
+        characterGender = person.gender;
+        console.log(`주인공 정보 확인: ${person.name}, 성별: ${person.gender}, 사진: ${person.photo}`);
+      } else {
+        console.log('주인공 Person 객체를 찾을 수 없거나 사진이 없음');
       }
     } 
     // 주인공이 없으면 사용자 자신
     else {
+      console.log('주인공 정보가 없어 사용자 정보 사용');
       if (user.profilePhoto) {
         characterPhoto = path.join(__dirname, '..', '..', user.profilePhoto);
       }
-      
-      // 사용자 성별 기반 기본 설명
-      const genderMap = { '남성': '1man', '여성': '1woman', '기타': '1person' };
-      characterDescription = genderMap[user.gender] || '1person';
+      characterGender = user.gender;
+      console.log(`사용자 정보 사용: 성별: ${user.gender}`);
     }
     
     if (!characterPhoto || !fs.existsSync(characterPhoto)) {
@@ -219,31 +500,58 @@ const generateImageForDiary = async (diary, user, artStyle) => {
     // 화풍별 필수 키워드 추출
     const requiredKeywords = artStyle.requiredKeywords || [];
     
-    // 프롬프트 생성 (필수 키워드 포함)
-    const finalPrompt = await generateImagePrompt(diary.content, characterDescription, requiredKeywords);
+    // 성별 정보 추출
+    let characterGenderForPrompt = characterGender;
+    
+    // 사용자 외모 키워드에서 성별 제거 (1man, 1woman, 1person 제거)
+    let finalUserAppearanceKeywords = userAppearanceKeywords;
+    if (finalUserAppearanceKeywords) {
+      finalUserAppearanceKeywords = finalUserAppearanceKeywords
+        .replace(/\b1man\b/gi, '')
+        .replace(/\b1woman\b/gi, '')
+        .replace(/\b1person\b/gi, '')
+        .replace(/,\s*,/g, ',') // 연속된 콤마 제거
+        .replace(/^,|,$/g, '') // 시작/끝 콤마 제거
+        .trim();
+    }
+    
+    // 기본 외모 키워드가 없으면 기본값 설정
+    if (!finalUserAppearanceKeywords || finalUserAppearanceKeywords.trim() === '') {
+      finalUserAppearanceKeywords = 'detailed face, expressive eyes';
+    }
+    
+    // 두 번째 단계: 프롬프트 생성 (성별 + 장면 묘사 + 추가 정보)
+    const finalPrompt = await generateImagePrompt(
+      sceneDescription,
+      diary.content,
+      characterGenderForPrompt,
+      finalUserAppearanceKeywords,
+      requiredKeywords
+    );
     
     // 프롬프트 로그에 필수 키워드 정보 추가
     const promptLog = {
-      finalPrompt,
-      characterDescription,
+      sceneDescription: sceneDescription,
+      finalPrompt: finalPrompt,
+      userAppearanceKeywords: finalUserAppearanceKeywords,
       requiredKeywords: requiredKeywords,
       artStyleId: artStyle.id,
       createdAt: new Date()
     };
     
-    
     console.log('=== 프롬프트 생성 로그 ===');
     console.log('화풍:', artStyle.name);
+    console.log('장면 묘사:', sceneDescription);
     console.log('필수 키워드:', requiredKeywords);
-    console.log('캐릭터 설명:', characterDescription);
+    console.log('사용자 외모 키워드:', finalUserAppearanceKeywords);
     console.log('최종 프롬프트:', finalPrompt);
     console.log('=======================');
     
-    // 워크플로우 실행
-    const workflowPath = path.join(__dirname, '..', '..', artStyle.workflowFile);
+    // 워크플로우 실행 (동적 워크플로우 선택)
+    const workflowPath = path.join(__dirname, '..', '..', 'workflows', artStyle.workflowFile);
     const imageName = characterPhoto ? path.basename(characterPhoto) : null;
     
-    const comfyResponse = await runOriginalWorkflow(workflowPath, finalPrompt, imageName);
+    const comfyResponse = await runOriginalWorkflow(workflowPath, finalPrompt, imageName, artStyle);
     
     if (!comfyResponse.success) {
       throw new Error(comfyResponse.error || '이미지 생성 실패');
@@ -342,7 +650,7 @@ const getDiariesByMonth = async (req, res) => {
 const getDiaryById = async (req, res) => {
   try {
     const diary = await Diary.findById(req.params.id)
-      .populate('mainCharacter.personId', 'name photo gender hairStyle clothing accessories');
+      .populate('mainCharacter.personId', 'name photo gender');
     
     if (!diary) {
       return res.status(404).json({ message: '일기를 찾을 수 없습니다.' });
@@ -433,7 +741,7 @@ const updateDiary = async (req, res) => {
       req.params.id,
       updateData,
       { new: true }
-    ).populate('mainCharacter.personId', 'name photo gender hairStyle clothing accessories');
+    ).populate('mainCharacter.personId', 'name photo gender');
     
     res.json(updatedDiary);
   } catch (error) {
@@ -523,7 +831,20 @@ const getDiaryPromptLog = async (req, res) => {
   }
 };
 
+// 모든 화풍 목록 조회
+const getAllArtStylesAPI = async (req, res) => {
+  try {
+    const artStyles = getAllArtStyles();
+    res.json(artStyles);
+  } catch (error) {
+    console.error('화풍 목록 조회 오류:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+};
+
 module.exports = {
+  generateSceneDescriptionAPI,
+  getAllArtStylesAPI,
   createDiary,
   getDiaries,
   getDiariesByMonth,

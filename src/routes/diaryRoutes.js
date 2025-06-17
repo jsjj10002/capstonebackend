@@ -9,12 +9,20 @@ const {
   deleteDiary,
   searchDiaries,
   getDiaryPromptLog,
+  generateSceneDescriptionAPI,
+  getAllArtStylesAPI,
 } = require('../controllers/diaryController');
 const { protect } = require('../middleware/authMiddleware');
 const { uploadLocal } = require('../config/uploadConfig');
 
 // 모든 라우트에 인증 미들웨어 적용
 router.use(protect);
+
+// 화풍 목록 조회 라우트
+router.get('/art-styles', getAllArtStylesAPI);
+
+// 장면 묘사 생성 라우트 (일기 작성 전 단계)
+router.post('/generate-scene', generateSceneDescriptionAPI);
 
 // 일기 작성 라우트
 router.post('/', uploadLocal.array('photos', 5), createDiary);

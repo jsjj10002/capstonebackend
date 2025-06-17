@@ -576,47 +576,110 @@ const runComfyWorkflow = async (workflow) => {
   }
 };
 
-// 원본 워크플로우를 그대로 사용하는 함수
-const runOriginalWorkflow = async (workflowPath, prompt, imageName) => {
+// runOriginalWorkflow 함수를 워크플로우 그대로 사용하도록 수정
+const runOriginalWorkflow = async (workflowPath, prompt, imageName, artStyleConfig = null) => {
   try {
-    console.log('원본 워크플로우 실행 시작...');
+    console.log(`=== ComfyUI 워크플로우 실행 시작 ===`);
+    console.log(`워크플로우 파일: ${workflowPath}`);
+    console.log(`프롬프트: ${prompt.substring(0, 100)}...`);
+    console.log(`이미지 파일: ${imageName || '없음'}`);
     
+    // 워크플로우 파일 읽기
     if (!fs.existsSync(workflowPath)) {
       throw new Error(`워크플로우 파일을 찾을 수 없습니다: ${workflowPath}`);
     }
     
     const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+    console.log(`워크플로우 로드 완료: ${Object.keys(workflow).length}개 노드`);
     
-    // 1. 워크플로우 형식 검증 및 변환 (메타데이터 정리)
-    let processedWorkflow = validateAndProcessWorkflow(workflow);
+    // 이미지 파일 처리
+    let imagePath = null;
+    let comfyImageName = imageName;
+    if (imageName) {
+      const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
+      imagePath = path.join(uploadsDir, imageName);
+      
+      if (!fs.existsSync(imagePath)) {
+        console.warn(`이미지 파일을 찾을 수 없습니다: ${imagePath}`);
+        imagePath = null;
+        comfyImageName = null;
+      } else {
+        console.log(`이미지 파일 확인: ${imagePath} (${fs.statSync(imagePath).size} bytes)`);
+        
+        // ComfyUI input 폴더로 이미지 복사
+        try {
+          const comfyInputDir = 'C:\\ComfyUI_windows_portable_nvidia\\ComfyUI_windows_portable\\ComfyUI\\input';
+          if (fs.existsSync(comfyInputDir)) {
+            const destPath = path.join(comfyInputDir, imageName);
+            fs.copyFileSync(imagePath, destPath);
+            console.log(`이미지 ComfyUI input 폴더로 복사 완료: ${destPath}`);
+          } else {
+            console.warn(`ComfyUI input 폴더를 찾을 수 없습니다: ${comfyInputDir}`);
+          }
+        } catch (copyError) {
+          console.error('이미지 복사 오류:', copyError.message);
+          // 복사 실패해도 계속 진행
+        }
+      }
+    }
     
-    // 2. 노드 연결 검증 및 복구
-    processedWorkflow = validateAndFixConnections(processedWorkflow);
+    console.log('워크플로우를 그대로 사용합니다 (설정 오버라이드 없음)');
     
-    // API 형식 워크플로우 설정 업데이트
-    updateAPIWorkflowSettings(processedWorkflow, prompt, imageName);
+    // 워크플로우 그대로 사용 - 프롬프트와 이미지만 교체
+    updateAPIWorkflowSettings(workflow, prompt, comfyImageName);
     
-    return await runComfyWorkflow(processedWorkflow);
+    // ComfyUI API 호출
+    const result = await runComfyWorkflow(workflow);
+    
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+    
+    // 이미지 다운로드
+    console.log(`이미지 다운로드 시작: ${result.imageUrl}`);
+    const imageResponse = await fetch(result.imageUrl);
+    
+    if (!imageResponse.ok) {
+      throw new Error(`이미지 다운로드 실패: ${imageResponse.status} ${imageResponse.statusText}`);
+    }
+    
+    const imageBuffer = await imageResponse.buffer();
+    console.log(`이미지 다운로드 완료: ${imageBuffer.length} bytes`);
+    
+    console.log(`=== ComfyUI 워크플로우 실행 완료 ===`);
+    
+    return {
+      success: true,
+      imageData: imageBuffer,
+      imageUrl: result.imageUrl,
+      promptUsed: prompt,
+      workflowFile: path.basename(workflowPath)
+    };
     
   } catch (error) {
-    console.error('원본 워크플로우 실행 오류:', error);
-    throw error;
+    console.error('ComfyUI 워크플로우 실행 오류:', error);
+    return {
+      success: false,
+      error: error.message,
+      workflowFile: workflowPath ? path.basename(workflowPath) : '알 수 없음'
+    };
   }
 };
-
-
 
 // API 형식 워크플로우 설정 업데이트 함수
 const updateAPIWorkflowSettings = (workflow, prompt, imageName) => {
   console.log('API 워크플로우 설정 업데이트 시작...');
+  
+  // 범용 연결 복구 시스템 사용
+  createUniversalConnectionSystem(workflow);
   
   for (const nodeId in workflow) {
     const node = workflow[nodeId];
     
     // 긍정 프롬프트 노드 찾기 (CLIPTextEncode)
     if (node.class_type === 'CLIPTextEncode') {
-      // 노드 6번이 긍정 프롬프트인지 확인 (네거티브가 아닌)
-      if (nodeId === '6' || (node.inputs.text && !node.inputs.text.includes('negative'))) {
+      // 노드 6번이 긍정 프롬프트 (부정 프롬프트 텍스트가 아닌 경우)
+      if (nodeId === '6' || (node.inputs.text && !node.inputs.text.toLowerCase().includes('embedding:badhand'))) {
         node.inputs.text = prompt;
         console.log(`프롬프트 설정 (노드 ${nodeId}): ${prompt.substring(0, 50)}...`);
       }
@@ -644,6 +707,182 @@ const updateAPIWorkflowSettings = (workflow, prompt, imageName) => {
   }
   
   console.log('API 워크플로우 설정 업데이트 완료');
+};
+
+// 노드 연결 정보 복구 함수
+const restoreNodeConnections = (workflow) => {
+  console.log('노드 연결 정보 복구 시작...');
+  
+  // Anything Everywhere 시스템이 제공하는 연결 정보 매핑
+  const anythingEverywhereConnections = {
+    // 노드 22 (Anything Everywhere3)가 제공하는 연결
+    model: ["46", 0],  // 노드 46의 model 출력
+    vae: ["13", 0],    // 노드 13의 vae 출력
+    // 노드 26 (Prompts Everywhere)가 제공하는 연결  
+    positive: ["6", 0], // 노드 6의 positive 출력
+    negative: ["7", 0]  // 노드 7의 negative 출력
+  };
+  
+  // 각 노드의 필수 연결 정보 복구
+  for (const nodeId in workflow) {
+    const node = workflow[nodeId];
+    
+    switch (node.class_type) {
+      case 'BasicScheduler':
+        if (nodeId === '54') {
+          // model 연결 복구
+          if (!node.inputs.model) {
+            node.inputs.model = anythingEverywhereConnections.model;
+            console.log(`노드 ${nodeId} model 연결 복구: ${JSON.stringify(anythingEverywhereConnections.model)}`);
+          }
+        }
+        break;
+        
+      case 'SamplerCustom':
+        if (nodeId === '56') {
+          // model, positive, negative 연결 복구
+          if (!node.inputs.model) {
+            node.inputs.model = anythingEverywhereConnections.model;
+            console.log(`노드 ${nodeId} model 연결 복구: ${JSON.stringify(anythingEverywhereConnections.model)}`);
+          }
+          if (!node.inputs.positive) {
+            node.inputs.positive = anythingEverywhereConnections.positive;
+            console.log(`노드 ${nodeId} positive 연결 복구: ${JSON.stringify(anythingEverywhereConnections.positive)}`);
+          }
+          if (!node.inputs.negative) {
+            node.inputs.negative = anythingEverywhereConnections.negative;
+            console.log(`노드 ${nodeId} negative 연결 복구: ${JSON.stringify(anythingEverywhereConnections.negative)}`);
+          }
+        }
+        break;
+        
+      case 'KSampler':
+        if (nodeId === '21') {
+          // model, positive, negative 연결 복구
+          if (!node.inputs.model) {
+            node.inputs.model = anythingEverywhereConnections.model;
+            console.log(`노드 ${nodeId} model 연결 복구: ${JSON.stringify(anythingEverywhereConnections.model)}`);
+          }
+          if (!node.inputs.positive) {
+            node.inputs.positive = anythingEverywhereConnections.positive;
+            console.log(`노드 ${nodeId} positive 연결 복구: ${JSON.stringify(anythingEverywhereConnections.positive)}`);
+          }
+          if (!node.inputs.negative) {
+            node.inputs.negative = anythingEverywhereConnections.negative;
+            console.log(`노드 ${nodeId} negative 연결 복구: ${JSON.stringify(anythingEverywhereConnections.negative)}`);
+          }
+        }
+        break;
+        
+      case 'VAEDecodeTiled':
+        if (nodeId === '38') {
+          // vae 연결 복구
+          if (!node.inputs.vae) {
+            node.inputs.vae = anythingEverywhereConnections.vae;
+            console.log(`노드 ${nodeId} vae 연결 복구: ${JSON.stringify(anythingEverywhereConnections.vae)}`);
+          }
+        }
+        break;
+        
+      case 'CLIPTextEncode':
+        if (nodeId === '6' || nodeId === '7') {
+          node.inputs.clip = ["10", 1];      // LoraLoader에서 CLIP
+          console.log(`노드 ${nodeId} clip 연결 복구: ["10", 1]`);
+        }
+        break;
+        
+      case 'LoraLoader':
+        if (nodeId === '10') {
+          node.inputs.model = ["4", 0];      // CheckpointLoader에서 모델
+          node.inputs.clip = ["16", 0];      // CLIPSetLastLayer에서 CLIP
+          console.log(`노드 ${nodeId} 연결 복구: model=["4",0], clip=["16",0]`);
+        }
+        break;
+        
+      case 'CLIPSetLastLayer':
+        if (nodeId === '16') {
+          node.inputs.clip = ["15", 0];      // CLIPLoader에서 CLIP
+          console.log(`노드 ${nodeId} clip 연결 복구: ["15", 0]`);
+        }
+        break;
+        
+      case 'FreeU_V2':
+        if (nodeId === '19') {
+          node.inputs.model = ["10", 0];     // LoraLoader에서 모델
+          console.log(`노드 ${nodeId} model 연결 복구: ["10", 0]`);
+        }
+        break;
+        
+      case 'LatentUpscaleBy':
+        if (nodeId === '20') {
+          node.inputs.samples = ["56", 1];   // SamplerCustom에서 latent
+          console.log(`노드 ${nodeId} samples 연결 복구: ["56", 1]`);
+        }
+        break;
+        
+      case 'SplitSigmas':
+        if (nodeId === '55') {
+          node.inputs.sigmas = ["54", 0];    // BasicScheduler에서 시그마
+          console.log(`노드 ${nodeId} sigmas 연결 복구: ["54", 0]`);
+        }
+        break;
+        
+      case 'IPAdapterUnifiedLoaderFaceID':
+        if (nodeId === '45') {
+          node.inputs.model = ["19", 0];     // FreeU_V2에서 모델
+          console.log(`노드 ${nodeId} model 연결 복구: ["19", 0]`);
+        }
+        break;
+        
+      case 'IPAdapterFaceID':
+        if (nodeId === '46') {
+          node.inputs.model = ["45", 0];     // IPAdapterUnifiedLoader에서 모델
+          node.inputs.ipadapter = ["45", 1]; // IPAdapterUnifiedLoader에서 어댑터
+          node.inputs.image = ["42", 0];     // LoadImage에서 이미지
+          console.log(`노드 ${nodeId} 연결 복구: model=["45",0], ipadapter=["45",1], image=["42",0]`);
+        }
+        break;
+        
+      case 'SaveImage':
+        if (nodeId === '9') {
+          node.inputs.images = ["38", 0];    // VAEDecodeTiled에서 이미지
+          console.log(`노드 ${nodeId} images 연결 복구: ["38", 0]`);
+        }
+        break;
+        
+      case 'Anything Everywhere3':
+        if (nodeId === '22') {
+          node.inputs.anything = ["46", 0];  // IPAdapterFaceID에서 모델
+          node.inputs.anything3 = ["13", 0]; // VAELoader에서 VAE
+          console.log(`노드 ${nodeId} 연결 복구: anything=["46",0], anything3=["13",0]`);
+        }
+        break;
+        
+      case 'Prompts Everywhere':
+        if (nodeId === '26') {
+          node.inputs['+ve'] = ["6", 0];     // 긍정 프롬프트
+          node.inputs['-ve'] = ["7", 0];     // 부정 프롬프트
+          console.log(`노드 ${nodeId} 연결 복구: +ve=["6",0], -ve=["7",0]`);
+        }
+        break;
+        
+      case 'KSamplerSelect':
+        if (nodeId === '57') {
+          // KSamplerSelect는 입력 연결이 필요하지 않음 (sampler_name만 설정)
+          console.log(`노드 ${nodeId} 연결 확인됨 (입력 불필요)`);
+        }
+        break;
+        
+      case 'DetailDaemonSamplerNode':
+        if (nodeId === '58') {
+          node.inputs.sampler = ["57", 0];   // KSamplerSelect에서 샘플러
+          console.log(`노드 ${nodeId} sampler 연결 복구: ["57", 0]`);
+        }
+        break;
+    }
+  }
+  
+  console.log('노드 연결 정보 복구 완료');
 };
 
 const validateAndProcessWorkflow = (workflow) => {
@@ -933,6 +1172,206 @@ const generateImageWithComfyUI = async (prompt, inputImagePath) => {
       error: error.message
     };
   }
+};
+
+// 범용 워크플로우 연결 복구 시스템
+const createUniversalConnectionSystem = (workflow) => {
+  console.log('범용 워크플로우 연결 복구 시스템 시작...');
+  
+  // 모든 노드의 출력 타입 분석
+  const nodeOutputs = {};
+  const nodeInputRequirements = {};
+  
+  for (const [nodeId, nodeData] of Object.entries(workflow)) {
+    const classType = nodeData.class_type;
+    
+    // 각 노드 타입별 출력 정의
+    switch (classType) {
+      case 'CheckpointLoaderSimple':
+        nodeOutputs[nodeId] = { model: 0, clip: 1, vae: 2 };
+        break;
+      case 'LoraLoader':
+        nodeOutputs[nodeId] = { model: 0, clip: 1 };
+        break;
+      case 'VAELoader':
+        nodeOutputs[nodeId] = { vae: 0 };
+        break;
+      case 'CLIPLoader':
+        nodeOutputs[nodeId] = { clip: 0 };
+        break;
+      case 'CLIPSetLastLayer':
+        nodeOutputs[nodeId] = { clip: 0 };
+        break;
+      case 'CLIPTextEncode':
+        nodeOutputs[nodeId] = { conditioning: 0 };
+        break;
+      case 'EmptyLatentImage':
+        nodeOutputs[nodeId] = { latent: 0 };
+        break;
+      case 'LoadImage':
+        nodeOutputs[nodeId] = { image: 0, mask: 1 };
+        break;
+      case 'IPAdapterUnifiedLoaderFaceID':
+        nodeOutputs[nodeId] = { model: 0, ipadapter: 1 };
+        break;
+      case 'IPAdapterFaceID':
+        nodeOutputs[nodeId] = { model: 0 };
+        break;
+      case 'FreeU_V2':
+        nodeOutputs[nodeId] = { model: 0 };
+        break;
+      case 'BasicScheduler':
+        nodeOutputs[nodeId] = { sigmas: 0 };
+        break;
+      case 'SplitSigmas':
+        nodeOutputs[nodeId] = { sigmas_1: 0, sigmas_2: 1 };
+        break;
+      case 'KSamplerSelect':
+        nodeOutputs[nodeId] = { sampler: 0 };
+        break;
+      case 'DetailDaemonSamplerNode':
+        nodeOutputs[nodeId] = { sampler: 0 };
+        break;
+      case 'SamplerCustom':
+        nodeOutputs[nodeId] = { latent: 0, denoised: 1 };
+        break;
+      case 'KSampler':
+        nodeOutputs[nodeId] = { latent: 0 };
+        break;
+      case 'LatentUpscaleBy':
+        nodeOutputs[nodeId] = { latent: 0 };
+        break;
+      case 'VAEDecodeTiled':
+      case 'VAEDecode':
+        nodeOutputs[nodeId] = { image: 0 };
+        break;
+    }
+    
+    // 각 노드 타입별 입력 요구사항 정의
+    switch (classType) {
+      case 'CLIPTextEncode':
+        nodeInputRequirements[nodeId] = { clip: 'clip' };
+        break;
+      case 'LoraLoader':
+        nodeInputRequirements[nodeId] = { model: 'model', clip: 'clip' };
+        break;
+      case 'CLIPSetLastLayer':
+        nodeInputRequirements[nodeId] = { clip: 'clip' };
+        break;
+      case 'FreeU_V2':
+        nodeInputRequirements[nodeId] = { model: 'model' };
+        break;
+      case 'IPAdapterUnifiedLoaderFaceID':
+        nodeInputRequirements[nodeId] = { model: 'model' };
+        break;
+      case 'IPAdapterFaceID':
+        nodeInputRequirements[nodeId] = { model: 'model', ipadapter: 'ipadapter', image: 'image' };
+        break;
+      case 'BasicScheduler':
+        nodeInputRequirements[nodeId] = { model: 'model' };
+        break;
+      case 'SplitSigmas':
+        nodeInputRequirements[nodeId] = { sigmas: 'sigmas' };
+        break;
+      case 'SamplerCustom':
+        nodeInputRequirements[nodeId] = { 
+          model: 'model', 
+          positive: 'conditioning', 
+          negative: 'conditioning',
+          sampler: 'sampler',
+          sigmas: 'sigmas',
+          latent_image: 'latent'
+        };
+        break;
+      case 'KSampler':
+        nodeInputRequirements[nodeId] = { 
+          model: 'model', 
+          positive: 'conditioning', 
+          negative: 'conditioning',
+          latent_image: 'latent'
+        };
+        break;
+      case 'LatentUpscaleBy':
+        nodeInputRequirements[nodeId] = { samples: 'latent' };
+        break;
+      case 'VAEDecodeTiled':
+      case 'VAEDecode':
+        nodeInputRequirements[nodeId] = { samples: 'latent', vae: 'vae' };
+        break;
+      case 'SaveImage':
+        nodeInputRequirements[nodeId] = { images: 'image' };
+        break;
+      case 'DetailDaemonSamplerNode':
+        nodeInputRequirements[nodeId] = { sampler: 'sampler' };
+        break;
+    }
+  }
+  
+  // Anything Everywhere 노드들 찾기
+  const anythingEverywhereNodes = {};
+  for (const [nodeId, nodeData] of Object.entries(workflow)) {
+    if (nodeData.class_type === 'Anything Everywhere3' || 
+        nodeData.class_type === 'Anything Everywhere' ||
+        nodeData.class_type === 'Prompts Everywhere') {
+      anythingEverywhereNodes[nodeId] = nodeData;
+    }
+  }
+  
+  // 자동 연결 복구
+  for (const [nodeId, requirements] of Object.entries(nodeInputRequirements)) {
+    const node = workflow[nodeId];
+    if (!node) continue;
+    
+    for (const [inputName, requiredType] of Object.entries(requirements)) {
+      // 이미 연결되어 있으면 건너뛰기
+      if (node.inputs[inputName] && Array.isArray(node.inputs[inputName])) {
+        continue;
+      }
+      
+      // 적절한 출력 노드 찾기
+      let bestConnection = null;
+      
+      // 특별한 매핑 (프롬프트의 경우)
+      if (requiredType === 'conditioning') {
+        if (inputName === 'positive') {
+          // 긍정 프롬프트 찾기
+          for (const [sourceId, sourceData] of Object.entries(workflow)) {
+            if (sourceData.class_type === 'CLIPTextEncode' && 
+                sourceData.inputs.text && 
+                !sourceData.inputs.text.toLowerCase().includes('worst quality')) {
+              bestConnection = [sourceId, 0];
+              break;
+            }
+          }
+        } else if (inputName === 'negative') {
+          // 부정 프롬프트 찾기
+          for (const [sourceId, sourceData] of Object.entries(workflow)) {
+            if (sourceData.class_type === 'CLIPTextEncode' && 
+                sourceData.inputs.text && 
+                sourceData.inputs.text.toLowerCase().includes('worst quality')) {
+              bestConnection = [sourceId, 0];
+              break;
+            }
+          }
+        }
+      } else {
+        // 일반적인 타입 매칭
+        for (const [sourceId, outputs] of Object.entries(nodeOutputs)) {
+          if (outputs[requiredType] !== undefined) {
+            bestConnection = [sourceId, outputs[requiredType]];
+            break;
+          }
+        }
+      }
+      
+      if (bestConnection) {
+        node.inputs[inputName] = bestConnection;
+        console.log(`자동 연결: 노드 ${nodeId}.${inputName} <- 노드 ${bestConnection[0]}.${bestConnection[1]}`);
+      }
+    }
+  }
+  
+  console.log('범용 워크플로우 연결 복구 완료');
 };
 
 module.exports = {

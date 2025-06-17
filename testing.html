@@ -184,7 +184,7 @@
 <body>
   <div class="header">
     <h1>일기 앱 백엔드 API 테스트</h1>
-    <p>v2.0 - 업데이트된 API 명세에 맞춘 완전한 테스트 도구</p>
+    <p>v2.1 - Gemini 2.5 Flash & 두 단계 AI 프로세스 지원</p>
     <div id="connectionStatus">
       <span class="status-indicator status-unknown"></span>
       서버 연결 상태: 확인 중...
@@ -375,16 +375,11 @@
             </div>
             <div>
               <div class="form-group">
-                <label for="personHairStyle">헤어스타일</label>
-                <input type="text" id="personHairStyle" placeholder="예: 긴 생머리, 단발, 곱슬머리">
+                <label for="personNote">메모 (선택)</label>
+                <textarea id="personNote" rows="3" placeholder="인물에 대한 추가 메모 (v2.1에서는 성별만 저장됩니다)"></textarea>
               </div>
-              <div class="form-group">
-                <label for="personClothing">의상</label>
-                <input type="text" id="personClothing" placeholder="예: 캐주얼, 정장, 운동복">
-              </div>
-              <div class="form-group">
-                <label for="personAccessories">악세사리</label>
-                <input type="text" id="personAccessories" placeholder="예: 안경, 목걸이, 모자">
+              <div style="background-color: #fff3cd; padding: 10px; border-radius: 5px; border: 1px solid #ffeaa7;">
+                <small><strong>v2.1 변경사항:</strong> 헤어스타일, 의상, 악세사리 필드는 제거되었습니다. 성별만 저장됩니다.</small>
               </div>
             </div>
           </div>
@@ -460,17 +455,8 @@
               </div>
             </div>
             <div>
-              <div class="form-group">
-                <label for="updatePersonHairStyle">헤어스타일</label>
-                <input type="text" id="updatePersonHairStyle" placeholder="수정할 헤어스타일">
-              </div>
-              <div class="form-group">
-                <label for="updatePersonClothing">의상</label>
-                <input type="text" id="updatePersonClothing" placeholder="수정할 의상">
-              </div>
-              <div class="form-group">
-                <label for="updatePersonAccessories">악세사리</label>
-                <input type="text" id="updatePersonAccessories" placeholder="수정할 악세사리">
+              <div style="background-color: #fff3cd; padding: 10px; border-radius: 5px; border: 1px solid #ffeaa7;">
+                <small><strong>v2.1 변경사항:</strong> 헤어스타일, 의상, 악세사리 필드는 더 이상 지원되지 않습니다.</small>
               </div>
             </div>
           </div>
@@ -484,6 +470,52 @@
     </div>
 
     <div id="diarySection" class="tabcontent">
+      <!-- 화풍 목록 조회 (v2.1 NEW) -->
+      <div class="section">
+        <div class="section-header">
+          <h3>🎨 화풍 목록 조회</h3>
+          <code>GET /api/diaries/art-styles</code>
+        </div>
+        <div class="section-content">
+          <p>사용 가능한 모든 화풍 스타일과 필수 키워드를 조회합니다.</p>
+          <button id="getArtStylesButton" onclick="getArtStyles()">화풍 목록 조회</button>
+          <div id="artStylesResult" class="result"></div>
+        </div>
+      </div>
+
+      <!-- 장면 묘사 생성 (v2.1 NEW) -->
+      <div class="section">
+        <div class="section-header">
+          <h3>🖼️ 장면 묘사 생성</h3>
+          <code>POST /api/diaries/generate-scene</code>
+        </div>
+        <div class="section-content">
+          <div class="form-grid">
+            <div>
+              <div class="form-group">
+                <label for="sceneContent">일기 내용 <span class="required">*</span></label>
+                <textarea id="sceneContent" rows="4" placeholder="@김철수와 카페에서 만났다. 오늘 날씨가 정말 좋았다."></textarea>
+              </div>
+              <div class="form-group">
+                <label for="sceneProtagonist">주인공 이름</label>
+                <input type="text" id="sceneProtagonist" placeholder="김철수">
+              </div>
+            </div>
+            <div>
+              <div class="form-group">
+                <label for="sceneHint">장면 방향 힌트 (선택)</label>
+                <input type="text" id="sceneHint" placeholder="따뜻한 오후의 카페">
+              </div>
+              <div style="background-color: #e8f5e8; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                <small><strong>Gemini 2.5 Flash:</strong> 일기 내용을 분석하여 시각적 장면 묘사를 생성합니다.</small>
+              </div>
+            </div>
+          </div>
+          <button id="generateSceneButton" onclick="generateSceneDescription()">장면 묘사 생성</button>
+          <div id="sceneGenerationResult" class="result"></div>
+        </div>
+      </div>
+
       <!-- 일기 작성 -->
       <div class="section">
         <div class="section-header">
@@ -505,11 +537,13 @@
                 <label for="diaryArtStyle">화풍 선택 <span class="required">*</span></label>
                 <select id="diaryArtStyle">
                   <option value="">화풍 선택</option>
-                  <option value="realistic">사실적 (Realistic)</option>
                   <option value="makoto_shinkai">신카이 마코토 (Makoto Shinkai)</option>
-                  <option value="watercolor">수채화 (Watercolor)</option>
-                  <option value="oil_painting">유화 (Oil Painting)</option>
+                  <option value="esthetic_80s">에스테틱 80년대 (Esthetic 80s)</option>
+                  <option value="3d_character">3D 캐릭터 (3D Character - Chibi)</option>
+                  <option value="minimalist_line">미니멀 라인 (Minimalist Line)</option>
+                  <option value="disney_pixar">디즈니 픽사 (Disney Pixar)</option>
                 </select>
+                <button type="button" onclick="loadArtStyles()" style="margin-top: 5px; padding: 5px 10px; font-size: 12px;">화풍 목록 새로고침</button>
               </div>
             </div>
             <div>
@@ -518,28 +552,30 @@
                 <input type="file" id="diaryPhotos" accept="image/*" multiple>
               </div>
               
-              <div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin-top: 15px;">
-                <h4 style="margin-top: 0;">주인공 정보 (연락처에 없는 사람일 경우)</h4>
+                              <div style="background-color: #e8f5e8; padding: 15px; border-radius: 6px; margin-top: 15px; border: 1px solid #c3e6cb;">
+                <h4 style="margin-top: 0;">v2.1 두 단계 프로세스</h4>
                 <div class="form-group">
-                  <label for="tempGender">성별</label>
-                  <select id="tempGender">
-                    <option value="">선택 안함</option>
+                  <label for="sceneDescription">장면 묘사 (선택)</label>
+                  <textarea id="sceneDescription" rows="3" placeholder="미리 생성된 장면 묘사를 입력하거나 비워두면 자동 생성됩니다"></textarea>
+                </div>
+                <div class="form-group">
+                  <label for="userAppearanceKeywords">사용자 외모 키워드 <span class="required">*</span></label>
+                  <input type="text" id="userAppearanceKeywords" placeholder="예: long hair, casual clothing, glasses (성별 제외)">
+                </div>
+                <div class="form-group">
+                  <label for="mainCharacterGender">새로운 인물 성별 (연락처에 없는 @태그 인물용)</label>
+                  <select id="mainCharacterGender">
+                    <option value="">선택해주세요</option>
                     <option value="남성">남성</option>
                     <option value="여성">여성</option>
                     <option value="기타">기타</option>
                   </select>
                 </div>
-                <div class="form-group">
-                  <label for="tempHairStyle">헤어스타일</label>
-                  <input type="text" id="tempHairStyle" placeholder="예: 긴 생머리, 단발">
+                <div style="background-color: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                  <small><strong>새로운 프로세스:</strong> 1) 장면 묘사 생성 → 2) 이미지 프롬프트 생성 → 3) 이미지 생성</small>
                 </div>
-                <div class="form-group">
-                  <label for="tempClothing">의상</label>
-                  <input type="text" id="tempClothing" placeholder="예: 캐주얼, 정장">
-                </div>
-                <div class="form-group">
-                  <label for="tempAccessories">악세사리</label>
-                  <input type="text" id="tempAccessories" placeholder="예: 안경, 목걸이">
+                <div style="background-color: #e8f5e8; padding: 10px; border-radius: 5px; margin-top: 5px; border: 1px solid #c3e6cb;">
+                  <small><strong>인물 자동 추가:</strong> @태그로 언급된 새로운 인물은 성별과 첫 번째 사진으로 자동 등록됩니다.</small>
                 </div>
               </div>
             </div>
@@ -689,6 +725,23 @@
         </div>
       </div>
 
+      <!-- Gemini AI 테스트 (v2.1 NEW) -->
+      <div class="section">
+        <div class="section-header">
+          <h3>🤖 Gemini AI 테스트</h3>
+          <code>Gemini 2.5 Flash Preview</code>
+        </div>
+        <div class="section-content">
+          <p>Gemini AI의 연결 상태와 응답을 테스트합니다. (간단한 장면 묘사 생성)</p>
+          <div class="form-group">
+            <label for="testGeminiContent">테스트 일기 내용</label>
+            <textarea id="testGeminiContent" rows="3" placeholder="오늘 공원에서 산책했다. 날씨가 정말 좋았다.">오늘 공원에서 산책했다. 날씨가 정말 좋았다.</textarea>
+          </div>
+          <button id="testGeminiButton" onclick="testGeminiAI()">Gemini AI 테스트</button>
+          <div id="testGeminiResult" class="result"></div>
+        </div>
+      </div>
+
       <!-- API 전체 상태 요약 -->
       <div class="section">
         <div class="section-header">
@@ -723,6 +776,8 @@
     // API 기본 설정
     const API_URL = 'http://localhost:5000/api';
     let authToken = localStorage.getItem('authToken');
+    let lastExtractedProtagonist = null; // 장면 묘사에서 추출된 주인공 이름 저장
+    let lastProtagonistInfo = null; // 장면 묘사에서 받은 주인공 정보 전체 저장 (v2.1)
     
     // 페이지 로드 시 초기화
     document.addEventListener('DOMContentLoaded', function() {
@@ -1005,9 +1060,6 @@
         
         const name = document.getElementById('personName').value;
         const gender = document.getElementById('personGender').value;
-        const hairStyle = document.getElementById('personHairStyle').value;
-        const clothing = document.getElementById('personClothing').value;
-        const accessories = document.getElementById('personAccessories').value;
         const photo = document.getElementById('personPhoto').files[0];
         
         if (!name || !photo) {
@@ -1018,9 +1070,6 @@
         const formData = new FormData();
         formData.append('name', name);
         if (gender) formData.append('gender', gender);
-        if (hairStyle) formData.append('hairStyle', hairStyle);
-        if (clothing) formData.append('clothing', clothing);
-        if (accessories) formData.append('accessories', accessories);
         formData.append('photo', photo);
         
         const response = await fetch(`${API_URL}/people`, {
@@ -1036,9 +1085,6 @@
           // 폼 초기화
           document.getElementById('personName').value = '';
           document.getElementById('personGender').value = '';
-          document.getElementById('personHairStyle').value = '';
-          document.getElementById('personClothing').value = '';
-          document.getElementById('personAccessories').value = '';
           document.getElementById('personPhoto').value = '';
         }
       } catch (err) {
@@ -1124,9 +1170,6 @@
           // 수정 폼에 기존 정보 채우기
           document.getElementById('updatePersonName').value = data.name || '';
           document.getElementById('updatePersonGender').value = data.gender || '';
-          document.getElementById('updatePersonHairStyle').value = data.hairStyle || '';
-          document.getElementById('updatePersonClothing').value = data.clothing || '';
-          document.getElementById('updatePersonAccessories').value = data.accessories || '';
         }
       } catch (err) {
         displayResult('getPersonResult', { error: err.message }, false);
@@ -1152,17 +1195,11 @@
         
         const name = document.getElementById('updatePersonName').value;
         const gender = document.getElementById('updatePersonGender').value;
-        const hairStyle = document.getElementById('updatePersonHairStyle').value;
-        const clothing = document.getElementById('updatePersonClothing').value;
-        const accessories = document.getElementById('updatePersonAccessories').value;
         const photo = document.getElementById('updatePersonPhoto').files[0];
         
         const formData = new FormData();
         if (name) formData.append('name', name);
         if (gender) formData.append('gender', gender);
-        if (hairStyle) formData.append('hairStyle', hairStyle);
-        if (clothing) formData.append('clothing', clothing);
-        if (accessories) formData.append('accessories', accessories);
         if (photo) formData.append('photo', photo);
         
         const response = await fetch(`${API_URL}/people/${id}`, {
@@ -1212,9 +1249,6 @@
           document.getElementById('personId').value = '';
           document.getElementById('updatePersonName').value = '';
           document.getElementById('updatePersonGender').value = '';
-          document.getElementById('updatePersonHairStyle').value = '';
-          document.getElementById('updatePersonClothing').value = '';
-          document.getElementById('updatePersonAccessories').value = '';
           document.getElementById('updatePersonPhoto').value = '';
         }
       } catch (err) {
@@ -1239,31 +1273,45 @@
         const artStyleId = document.getElementById('diaryArtStyle').value;
         const photos = document.getElementById('diaryPhotos').files;
         
-        // 주인공 임시 정보
-        const tempGender = document.getElementById('tempGender').value;
-        const tempHairStyle = document.getElementById('tempHairStyle').value;
-        const tempClothing = document.getElementById('tempClothing').value;
-        const tempAccessories = document.getElementById('tempAccessories').value;
+        // v2.1 새로운 필드들
+        const sceneDescription = document.getElementById('sceneDescription').value;
+        const userAppearanceKeywords = document.getElementById('userAppearanceKeywords').value;
+        const mainCharacterGender = document.getElementById('mainCharacterGender').value;
         
-        if (!content || !artStyleId) {
-          displayResult('createDiaryResult', { error: '일기 내용과 화풍은 필수입니다.' }, false);
+        if (!content || !artStyleId || !userAppearanceKeywords) {
+          displayResult('createDiaryResult', { error: '일기 내용, 화풍, 사용자 외모 키워드는 필수입니다.' }, false);
           return;
         }
         
         const formData = new FormData();
         formData.append('content', content);
         formData.append('artStyleId', artStyleId);
+        formData.append('userAppearanceKeywords', userAppearanceKeywords);
         if (diaryDate) formData.append('diaryDate', diaryDate);
+        if (sceneDescription) formData.append('sceneDescription', sceneDescription);
+        if (mainCharacterGender) formData.append('mainCharacterGender', mainCharacterGender);
         
-        // 주인공 임시 정보 추가
-        const mainCharacter = {};
-        if (tempGender) mainCharacter.gender = tempGender;
-        if (tempHairStyle) mainCharacter.hairStyle = tempHairStyle;
-        if (tempClothing) mainCharacter.clothing = tempClothing;
-        if (tempAccessories) mainCharacter.accessories = tempAccessories;
+        // 장면 묘사에서 추출된 주인공 이름이 있으면 전달
+        if (lastExtractedProtagonist) {
+          formData.append('protagonistName', lastExtractedProtagonist);
+          console.log('주인공 이름 전달:', lastExtractedProtagonist);
+        }
         
-        if (Object.keys(mainCharacter).length > 0) {
-          formData.append('mainCharacter', JSON.stringify(mainCharacter));
+        // 장면 묘사에서 받은 주인공 정보가 있으면 전달 (v2.1)
+        if (lastProtagonistInfo) {
+          if (lastProtagonistInfo.personId) {
+            formData.append('mainCharacterPersonId', lastProtagonistInfo.personId);
+            console.log('주인공 PersonId 전달:', lastProtagonistInfo.personId);
+          }
+          if (lastProtagonistInfo.name) {
+            formData.append('mainCharacterName', lastProtagonistInfo.name);
+            console.log('주인공 이름 전달:', lastProtagonistInfo.name);
+          }
+          if (lastProtagonistInfo.gender) {
+            formData.append('mainCharacterGender', lastProtagonistInfo.gender);
+            console.log('주인공 성별 전달:', lastProtagonistInfo.gender);
+          }
+          console.log('주인공 정보 전체 전달:', lastProtagonistInfo);
         }
         
         for (let i = 0; i < photos.length; i++) {
@@ -1302,11 +1350,15 @@
           document.getElementById('diaryContent').value = '';
           document.getElementById('diaryDate').value = '';
           document.getElementById('diaryArtStyle').value = '';
-          document.getElementById('tempGender').value = '';
-          document.getElementById('tempHairStyle').value = '';
-          document.getElementById('tempClothing').value = '';
-          document.getElementById('tempAccessories').value = '';
+          document.getElementById('sceneDescription').value = '';
+          document.getElementById('userAppearanceKeywords').value = '';
+          document.getElementById('mainCharacterGender').value = '';
           document.getElementById('diaryPhotos').value = '';
+          
+          // 저장된 주인공 이름 초기화
+          lastExtractedProtagonist = null;
+          // 저장된 주인공 정보 초기화 (v2.1)
+          lastProtagonistInfo = null;
         }
       } catch (err) {
         displayResult('createDiaryResult', { error: err.message }, false);
@@ -1608,6 +1660,44 @@
           };
         }
         
+        // Gemini AI 상태 확인 (v2.1 NEW)
+        if (authToken) {
+          try {
+            const geminiTestBody = {
+              content: '테스트 일기 내용',
+              protagonistName: '테스트',
+              sceneDirectionHint: '시스템 테스트'
+            };
+            
+            const geminiResponse = await fetch(`${API_URL}/diaries/generate-scene`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(geminiTestBody)
+            });
+            
+            const geminiData = await geminiResponse.json();
+            results.checks.geminiAI = {
+              status: geminiResponse.ok ? 'OK' : 'FAIL',
+              model: 'gemini-2.5-flash-preview-05-20',
+              response: geminiData
+            };
+          } catch (err) {
+            results.checks.geminiAI = {
+              status: 'FAIL',
+              model: 'gemini-2.5-flash-preview-05-20',
+              error: err.message
+            };
+          }
+        } else {
+          results.checks.geminiAI = {
+            status: 'NO_TOKEN',
+            message: '인증 토큰이 필요합니다.'
+          };
+        }
+        
         // 인증 상태 확인
         if (authToken) {
           try {
@@ -1676,6 +1766,182 @@
       }
     }
     
+    // v2.1 새로운 API 함수들
+    
+    // 화풍 목록 조회
+    async function getArtStyles() {
+      try {
+        setButtonLoading('getArtStylesButton', true);
+        
+        if (!authToken) {
+          displayResult('artStylesResult', { error: '로그인이 필요합니다.' }, false);
+          return;
+        }
+        
+        const response = await fetch(`${API_URL}/diaries/art-styles`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        const data = await response.json();
+        displayResult('artStylesResult', data, response.ok);
+      } catch (err) {
+        displayResult('artStylesResult', { error: err.message }, false);
+      } finally {
+        setButtonLoading('getArtStylesButton', false);
+      }
+    }
+    
+    // 화풍 목록을 동적으로 로드하여 select 옵션 업데이트
+    async function loadArtStyles() {
+      try {
+        if (!authToken) {
+          alert('로그인이 필요합니다.');
+          return;
+        }
+        
+        const response = await fetch(`${API_URL}/diaries/art-styles`, {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const select = document.getElementById('diaryArtStyle');
+          
+          // 기존 옵션 제거 (첫 번째 옵션 제외)
+          while (select.children.length > 1) {
+            select.removeChild(select.lastChild);
+          }
+          
+          // 새 옵션 추가
+          if (data.artStyles && Array.isArray(data.artStyles)) {
+            data.artStyles.forEach(style => {
+              const option = document.createElement('option');
+              option.value = style.id;
+              option.textContent = `${style.name} (${style.description || style.id})`;
+              select.appendChild(option);
+            });
+            alert('화풍 목록이 업데이트되었습니다.');
+          }
+        } else {
+          alert('화풍 목록을 불러오는데 실패했습니다.');
+        }
+      } catch (err) {
+        alert('화풍 목록 로드 중 오류가 발생했습니다: ' + err.message);
+      }
+    }
+    
+    // 장면 묘사 생성
+    async function generateSceneDescription() {
+      try {
+        setButtonLoading('generateSceneButton', true);
+        
+        if (!authToken) {
+          displayResult('sceneGenerationResult', { error: '로그인이 필요합니다.' }, false);
+          return;
+        }
+        
+        const content = document.getElementById('sceneContent').value;
+        const protagonistName = document.getElementById('sceneProtagonist').value;
+        const sceneHint = document.getElementById('sceneHint').value;
+        
+        if (!content) {
+          displayResult('sceneGenerationResult', { error: '일기 내용을 입력해주세요.' }, false);
+          return;
+        }
+        
+        const requestBody = {
+          content: content,
+          protagonistName: protagonistName || '',
+          sceneDirectionHint: sceneHint || ''
+        };
+        
+        const response = await fetch(`${API_URL}/diaries/generate-scene`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        });
+        
+        const data = await response.json();
+        displayResult('sceneGenerationResult', data, response.ok);
+        
+        // 성공시 일기 작성 폼의 장면 묘사 필드에 자동 입력 및 주인공 이름 저장
+        if (response.ok && data.sceneDescription) {
+          const sceneDescField = document.getElementById('sceneDescription');
+          if (sceneDescField) {
+            sceneDescField.value = data.sceneDescription;
+          }
+          
+          // 추출된 주인공 이름 저장
+          if (data.extractedProtagonist) {
+            lastExtractedProtagonist = data.extractedProtagonist;
+            console.log('주인공 이름 저장됨:', lastExtractedProtagonist);
+          }
+          
+          // 주인공 정보 전체 저장 (v2.1)
+          if (data.protagonistInfo) {
+            lastProtagonistInfo = data.protagonistInfo;
+            console.log('주인공 정보 전체 저장됨:', lastProtagonistInfo);
+          }
+          
+          alert('생성된 장면 묘사가 일기 작성 폼에 자동으로 입력되었습니다.');
+        }
+      } catch (err) {
+        displayResult('sceneGenerationResult', { error: err.message }, false);
+      } finally {
+        setButtonLoading('generateSceneButton', false);
+             }
+     }
+     
+     // Gemini AI 테스트 함수
+     async function testGeminiAI() {
+       try {
+         setButtonLoading('testGeminiButton', true);
+         
+         if (!authToken) {
+           displayResult('testGeminiResult', { error: '로그인이 필요합니다.' }, false);
+           return;
+         }
+         
+         const content = document.getElementById('testGeminiContent').value || '오늘 공원에서 산책했다. 날씨가 정말 좋았다.';
+         
+         const requestBody = {
+           content: content,
+           protagonistName: '테스트',
+           sceneDirectionHint: '테스트용 장면'
+         };
+         
+         const startTime = Date.now();
+         const response = await fetch(`${API_URL}/diaries/generate-scene`, {
+           method: 'POST',
+           headers: {
+             'Authorization': `Bearer ${authToken}`,
+             'Content-Type': 'application/json'
+           },
+           body: JSON.stringify(requestBody)
+         });
+         const endTime = Date.now();
+         
+         const data = await response.json();
+         
+         // 응답 시간 추가
+         const testResult = {
+           ...data,
+           responseTime: `${endTime - startTime}ms`,
+           geminiModel: 'gemini-2.5-flash-preview-05-20',
+           testTimestamp: new Date().toISOString()
+         };
+         
+         displayResult('testGeminiResult', testResult, response.ok);
+       } catch (err) {
+         displayResult('testGeminiResult', { error: err.message }, false);
+       } finally {
+         setButtonLoading('testGeminiButton', false);
+       }
+     }
+     
 
   </script>
 </body>
