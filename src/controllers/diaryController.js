@@ -125,6 +125,7 @@ const createDiary = async (req, res) => {
       userAppearanceKeywords,
       mainCharacterGender
     });
+    console.log('업로드된 파일:', req.files ? `${req.files.length}개` : '없음');
     console.log('identifiedPerson:', identifiedPerson);
     console.log('selectedPersonId:', selectedPersonId);
     console.log('mainCharacterGender:', mainCharacterGender);
@@ -188,6 +189,13 @@ const createDiary = async (req, res) => {
     
     console.log('생성된 프롬프트:', imagePrompt);
     
+    // 업로드된 사진들 처리
+    let photos = [];
+    if (req.files && req.files.length > 0) {
+      photos = req.files.map(file => `/uploads/${file.filename}`);
+      console.log('저장할 사진들:', photos);
+    }
+
     // 일기 저장
     const newDiary = await Diary.create({
       content,
@@ -197,6 +205,7 @@ const createDiary = async (req, res) => {
       imagePrompt,
       artStyleId,
       mainCharacter: mainCharacterData,
+      photos: photos, // 업로드된 사진들 저장
       promptLog: {
         sceneDescription,
         finalPrompt: imagePrompt,
@@ -212,7 +221,7 @@ const createDiary = async (req, res) => {
     
     // 이미지 생성 대기 (동기적 처리)
     console.log('이미지 생성 시작 - 완료까지 대기...');
-    const imageResult = await generateImageForDiary(newDiary, req.user, artStyle, sceneDescription, userAppearanceKeywords || '');
+    const imageResult = await generateImageForDiary(newDiary, req.user, artStyle, sceneDescription, userAppearanceKeywords || '', req.files);
     
     // 최신 일기 정보 조회 (이미지 URL 포함)
     const updatedDiary = await Diary.findById(newDiary._id).populate('mainCharacter.personId', 'name gender photo');
@@ -257,18 +266,25 @@ const createDiary = async (req, res) => {
 };
 
 // 이미지 생성 함수 (동기적 처리)
-const generateImageForDiary = async (diary, user, artStyle, sceneDescription, userAppearanceKeywords) => {
+const generateImageForDiary = async (diary, user, artStyle, sceneDescription, userAppearanceKeywords, uploadedFiles) => {
   try {
     console.log('=== 이미지 생성 시작 ===');
     console.log('일기 ID:', diary._id);
     console.log('화풍:', artStyle.name);
     console.log('주인공 정보:', diary.mainCharacter);
     console.log('식별된 인물:', diary.identifiedPerson);
+    console.log('업로드된 파일:', uploadedFiles ? `${uploadedFiles.length}개` : '없음');
     
-    // 인물 사진 파일 결정
+    // 인물 사진 파일 결정 (우선순위: 업로드된 파일 > 기존 인물 사진 > 사용자 프로필 사진)
     let imageFileName = null;
     
-    if (diary.identifiedPerson === '나') {
+    // 1순위: 업로드된 파일이 있는 경우 첫 번째 파일 사용
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      imageFileName = uploadedFiles[0].filename;
+      console.log('업로드된 파일 사용:', imageFileName);
+    }
+    // 2순위: 기존 로직 (프로필 사진 또는 인물 사진)
+    else if (diary.identifiedPerson === '나') {
       // '나'인 경우 사용자 프로필 사진 사용
       if (user.profilePhoto) {
         imageFileName = user.profilePhoto.replace('/uploads/', '');
