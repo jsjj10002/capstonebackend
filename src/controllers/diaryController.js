@@ -288,7 +288,7 @@ const generateImageForDiary = async (diary, user, artStyle, sceneDescription, us
       // '나'인 경우 사용자 프로필 사진 사용
       if (user.profilePhoto) {
         imageFileName = user.profilePhoto.replace('/uploads/', '');
-        console.log('사용자 프로필 사진 사용:', imageFileName);
+        console.log('사용자 프로필 사진 사용 (본인):', imageFileName);
       } else {
         console.log('사용자 프로필 사진이 없음 - 기본 처리');
       }
@@ -299,7 +299,21 @@ const generateImageForDiary = async (diary, user, artStyle, sceneDescription, us
         imageFileName = selectedPerson.photo.replace('/uploads/', '');
         console.log('선택된 인물 사진 사용:', imageFileName, '(인물:', selectedPerson.name, ')');
       } else {
-        console.log('선택된 인물의 사진이 없음');
+        console.log('선택된 인물의 사진이 없음 - 프로필 사진으로 대체 시도');
+        // 선택된 인물의 사진이 없으면 사용자 프로필 사진 사용
+        if (user.profilePhoto) {
+          imageFileName = user.profilePhoto.replace('/uploads/', '');
+          console.log('사용자 프로필 사진 사용 (인물 사진 대체):', imageFileName);
+        }
+      }
+    } else {
+      // 3순위: 새로운 인물이고 선택된 인물도 없는 경우 사용자 프로필 사진 사용
+      console.log('새로운 인물이고 선택된 인물 없음 - 프로필 사진 사용 시도');
+      if (user.profilePhoto) {
+        imageFileName = user.profilePhoto.replace('/uploads/', '');
+        console.log('사용자 프로필 사진 사용 (기본값):', imageFileName);
+      } else {
+        console.log('사용자 프로필 사진도 없음 - 텍스트만으로 이미지 생성');
       }
     }
     
