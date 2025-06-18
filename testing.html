@@ -197,7 +197,7 @@
 <body>
   <div class="header">
     <h1>일기 앱 백엔드 API 테스트</h1>
-    <p>v3.0 - JSON 기반 장면 묘사 & 스마트 태그 시스템</p>
+    <p>v3.0.1 - 간소화된 워크플로우 & 동기적 이미지 생성</p>
     <div id="connectionStatus">
       <span class="status-indicator status-unknown"></span>
       서버 연결 상태: 확인 중...
@@ -535,10 +535,100 @@
         </div>
       </div>
 
+      <!-- 일기 작성 - 간소화된 방식 (v3.0.1 업데이트) -->
+      <div class="section">
+        <div class="section-header">
+          <h3>✍️ 일기 작성 - 간소화된 방식 (v3.0.1)</h3>
+          <code>POST /api/diaries - 간소화된 워크플로우</code>
+        </div>
+        <div class="section-content">
+          <div class="v3-highlight">
+            <h4>v3.0.1 간소화된 워크플로우</h4>
+            <p><strong>프론트엔드 요청 방식:</strong> selectedPersonId 없이도 이미지 생성 가능</p>
+            <ol>
+              <li>일기 내용 입력 (@태그 지원)</li>
+              <li>장면 묘사 자동 생성</li>
+              <li>외모 키워드 + 성별 입력 (인물 선택 없이)</li>
+              <li>동기적 이미지 생성 (완료 후 응답)</li>
+            </ol>
+            <p><strong>특징:</strong> 기존 인물 DB 없이도 바로 이미지 생성 가능</p>
+          </div>
+          
+          <div class="form-grid">
+            <div>
+              <div class="form-group">
+                <label for="simpleDiaryContent">1단계: 일기 내용 (@태그 지원) <span class="required">*</span></label>
+                <textarea id="simpleDiaryContent" rows="4" placeholder="@친구와 카페에서 커피를 마셨다. 정말 즐거운 시간이었다.&#10;&#10;@태그를 사용하면 자동으로 주인공을 식별합니다."></textarea>
+                <button type="button" onclick="generateSceneFromSimpleDiary()" style="margin-top: 5px; padding: 8px 12px; font-size: 12px; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">2단계: 장면 묘사 자동 생성</button>
+              </div>
+              
+              <div class="form-group">
+                <label for="simpleSceneDescription">2단계: 장면 묘사 (자동 생성됨)</label>
+                <textarea id="simpleSceneDescription" rows="3" placeholder="위의 '장면 묘사 자동 생성' 버튼을 눌러 생성하세요" readonly style="background-color: #f8f9fa;"></textarea>
+              </div>
+              
+              <div class="form-group">
+                <label for="simpleMainCharacterGender">3단계: 주인공 성별 <span class="required">*</span></label>
+                <select id="simpleMainCharacterGender">
+                  <option value="">성별 선택</option>
+                  <option value="남성">남성</option>
+                  <option value="여성">여성</option>
+                  <option value="기타">기타</option>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label for="simpleUserAppearanceKeywords">3단계: 외모 키워드 <span class="required">*</span></label>
+                <input type="text" id="simpleUserAppearanceKeywords" placeholder="예: long hair, casual clothing, glasses">
+              </div>
+            </div>
+            <div>
+              <div class="form-group">
+                <label for="simpleDiaryDate">일기 날짜</label>
+                <input type="date" id="simpleDiaryDate">
+              </div>
+              
+              <div class="form-group">
+                <label for="simpleDiaryArtStyle">화풍 선택 <span class="required">*</span></label>
+                <select id="simpleDiaryArtStyle">
+                  <option value="">화풍 선택</option>
+                  <option value="makoto_shinkai">신카이 마코토 (Makoto Shinkai)</option>
+                  <option value="esthetic_80s">에스테틱 80년대 (Esthetic 80s)</option>
+                  <option value="3d_character">3D 캐릭터 (3D Character - Chibi)</option>
+                  <option value="minimalist_line">미니멀 라인 (Minimalist Line)</option>
+                  <option value="disney_pixar">디즈니 픽사 (Disney Pixar)</option>
+                  <option value="animal_crossing">동물의 숲 (Animal Crossing)</option>
+                  <option value="rhythm_heaven">리듬 헤븐 (Rhythm Heaven)</option>
+                  <option value="studio_ghibli">스튜디오 지브리 (Studio Ghibli)</option>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label for="simpleDiaryPhotos">사진 (최대 5개)</label>
+                <input type="file" id="simpleDiaryPhotos" accept="image/*" multiple>
+              </div>
+              
+              <div style="background-color: #e8f4fd; padding: 15px; border-radius: 5px; margin-top: 10px; border: 1px solid #b8daff;">
+                <h4 style="margin-top: 0; color: #004085;">v3.0.1 간소화된 워크플로우</h4>
+                <ul style="margin-bottom: 0; padding-left: 20px;">
+                  <li>기존 인물 DB 연동 없이 바로 사용 가능</li>
+                  <li>프론트엔드 요청 데이터만으로 이미지 생성</li>
+                  <li>동기적 처리로 완성된 이미지와 함께 응답</li>
+                  <li>selectedPersonId 필드 불필요</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <button id="createSimpleDiaryButton" onclick="createSimpleDiary()" style="padding: 15px 25px; font-size: 16px; font-weight: bold; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">4단계: 간소화된 일기 작성 (이미지 생성)</button>
+          <div id="createSimpleDiaryResult" class="result"></div>
+          <div id="generatedSimpleDiaryImage" style="margin-top: 15px;"></div>
+        </div>
+      </div>
+
       <!-- 일기 작성 (v3.0 업데이트) -->
       <div class="section">
         <div class="section-header">
-          <h3>✍️ 일기 작성 (v3.0)</h3>
+          <h3>✍️ 일기 작성 - 기존 방식 (v3.0)</h3>
           <code>POST /api/diaries</code>
         </div>
         <div class="section-content">
@@ -2303,6 +2393,196 @@
          displayResult('testGeminiResult', { error: err.message }, false);
        } finally {
          setButtonLoading('testGeminiButton', false);
+       }
+     }
+
+     // v3.0.1 간소화된 일기 내용으로 장면 묘사 생성
+     let lastSimpleSceneData = null; // 간소화된 버전용 별도 변수
+     
+     async function generateSceneFromSimpleDiary() {
+       try {
+         // 버튼 로딩 상태 설정
+         const generateButton = document.querySelector('button[onclick="generateSceneFromSimpleDiary()"]');
+         if (generateButton) {
+           generateButton.disabled = true;
+           generateButton.textContent = "장면 묘사 생성 중...";
+         }
+         
+         const diaryContent = document.getElementById('simpleDiaryContent').value;
+         if (!diaryContent) {
+           alert('먼저 일기 내용을 입력해주세요.');
+           return;
+         }
+         
+         if (!authToken) {
+           alert('로그인이 필요합니다.');
+           return;
+         }
+         
+         const requestBody = {
+           content: diaryContent
+         };
+         
+         console.log('v3.0.1 간소화된 장면 묘사 요청:', requestBody);
+         
+         const response = await fetch(`${API_URL}/diaries/generate-scene`, {
+           method: 'POST',
+           headers: {
+             'Authorization': `Bearer ${authToken}`,
+             'Content-Type': 'application/json'
+           },
+           body: JSON.stringify(requestBody)
+         });
+         
+         const data = await response.json();
+         console.log('v3.0.1 간소화된 장면 묘사 응답:', data);
+         
+         if (response.ok && data.sceneDescription && data.identifiedPerson) {
+           // 장면 묘사 칸에 자동 입력
+           const sceneDescField = document.getElementById('simpleSceneDescription');
+           if (sceneDescField) {
+             sceneDescField.value = data.sceneDescription;
+           }
+           
+           // 간소화된 버전용 JSON 데이터 저장
+           lastSimpleSceneData = {
+             sceneDescription: data.sceneDescription,
+             identifiedPerson: data.identifiedPerson
+           };
+           
+           console.log('v3.0.1 간소화된 JSON 장면 데이터 저장됨:', lastSimpleSceneData);
+           
+           // 성공 팝업 표시
+           alert(`✅ 장면 묘사가 생성되었습니다!\n\n주인공: ${data.identifiedPerson}\n장면: ${data.sceneDescription.substring(0, 100)}${data.sceneDescription.length > 100 ? '...' : ''}\n\n다음 단계: 주인공 성별과 외모 키워드를 입력해주세요.`);
+           
+         } else {
+           throw new Error(data.message || '장면 묘사 생성에 실패했습니다.');
+         }
+         
+       } catch (err) {
+         console.error('간소화된 장면 묘사 생성 오류:', err);
+         alert('❌ 장면 묘사 생성 중 오류가 발생했습니다: ' + err.message);
+       } finally {
+         // 버튼 상태 복원
+         const generateButton = document.querySelector('button[onclick="generateSceneFromSimpleDiary()"]');
+         if (generateButton) {
+           generateButton.disabled = false;
+           generateButton.textContent = "2단계: 장면 묘사 자동 생성";
+         }
+       }
+     }
+
+     // v3.0.1 간소화된 일기 작성 (selectedPersonId 없이)
+     async function createSimpleDiary() {
+       try {
+         setButtonLoading('createSimpleDiaryButton', true);
+         
+         if (!authToken) {
+           displayResult('createSimpleDiaryResult', { error: '로그인이 필요합니다.' }, false);
+           return;
+         }
+         
+         const content = document.getElementById('simpleDiaryContent').value;
+         const diaryDate = document.getElementById('simpleDiaryDate').value;
+         const artStyleId = document.getElementById('simpleDiaryArtStyle').value;
+         const photos = document.getElementById('simpleDiaryPhotos').files;
+         
+         // v3.0.1 간소화된 필드들
+         const sceneDescription = document.getElementById('simpleSceneDescription').value;
+         const mainCharacterGender = document.getElementById('simpleMainCharacterGender').value;
+         const userAppearanceKeywords = document.getElementById('simpleUserAppearanceKeywords').value;
+         
+         if (!content || !artStyleId || !sceneDescription || !mainCharacterGender || !userAppearanceKeywords) {
+           displayResult('createSimpleDiaryResult', { error: 'v3.0.1: 일기 내용, 화풍, 장면 묘사, 주인공 성별, 외모 키워드는 필수입니다.' }, false);
+           return;
+         }
+         
+         // identifiedPerson 확인
+         let identifiedPerson = null;
+         if (lastSimpleSceneData && lastSimpleSceneData.identifiedPerson) {
+           identifiedPerson = lastSimpleSceneData.identifiedPerson;
+         }
+         
+         if (!identifiedPerson) {
+           displayResult('createSimpleDiaryResult', { error: '먼저 장면 묘사를 생성해주세요. 식별된 인물 정보가 필요합니다.' }, false);
+           return;
+         }
+         
+         console.log('v3.0.1 간소화된 방식 - identifiedPerson:', identifiedPerson);
+         
+         const formData = new FormData();
+         formData.append('content', content);
+         formData.append('artStyleId', artStyleId);
+         formData.append('sceneDescription', sceneDescription);
+         formData.append('identifiedPerson', identifiedPerson);
+         formData.append('mainCharacterGender', mainCharacterGender);
+         formData.append('userAppearanceKeywords', userAppearanceKeywords);
+         if (diaryDate) formData.append('diaryDate', diaryDate);
+         
+         // selectedPersonId는 제외 (간소화된 방식)
+         
+         for (let i = 0; i < photos.length; i++) {
+           formData.append('photos', photos[i]);
+         }
+         
+         // 디버깅: FormData 내용 출력
+         console.log('v3.0.1 간소화된 일기 작성 요청 시작');
+         console.log('FormData 내용:');
+         for (let [key, value] of formData.entries()) {
+           console.log(`${key}:`, value);
+         }
+         
+         const response = await fetch(`${API_URL}/diaries`, {
+           method: 'POST',
+           headers: { 'Authorization': `Bearer ${authToken}` },
+           body: formData
+         });
+         
+         const data = await response.json();
+         console.log('v3.0.1 간소화된 일기 작성 응답:', data);
+         
+         displayResult('createSimpleDiaryResult', data, response.ok);
+         
+         // 생성된 이미지 표시
+         if (response.ok && data.diary && data.diary.generatedImage) {
+           const imageContainer = document.getElementById('generatedSimpleDiaryImage');
+           const img = document.createElement('img');
+           img.src = data.diary.generatedImage.startsWith('http') ? data.diary.generatedImage : 
+                    data.diary.generatedImage.startsWith('/') ? `http://localhost:5000${data.diary.generatedImage}` : 
+                    `http://localhost:5000/${data.diary.generatedImage}`;
+           img.alt = 'v3.0.1 간소화된 방식으로 생성된 일기 이미지';
+           img.style.maxWidth = '100%';
+           img.style.maxHeight = '400px';
+           img.style.border = '1px solid #ddd';
+           img.style.borderRadius = '5px';
+           img.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
+           
+           imageContainer.innerHTML = '<h4>v3.0.1 간소화된 방식으로 생성된 이미지:</h4>';
+           imageContainer.appendChild(img);
+           
+           // 성공 알림
+           alert('✅ 간소화된 방식으로 일기와 이미지가 성공적으로 생성되었습니다!');
+         }
+         
+         if (response.ok) {
+           // 폼 초기화
+           document.getElementById('simpleDiaryContent').value = '';
+           document.getElementById('simpleDiaryDate').value = '';
+           document.getElementById('simpleDiaryArtStyle').value = '';
+           document.getElementById('simpleSceneDescription').value = '';
+           document.getElementById('simpleMainCharacterGender').value = '';
+           document.getElementById('simpleUserAppearanceKeywords').value = '';
+           document.getElementById('simpleDiaryPhotos').value = '';
+           
+           // 저장된 데이터 초기화
+           lastSimpleSceneData = null;
+           console.log('v3.0.1 간소화된 데이터 초기화 완료');
+         }
+       } catch (err) {
+         console.error('v3.0.1 간소화된 일기 작성 오류:', err);
+         displayResult('createSimpleDiaryResult', { error: err.message }, false);
+       } finally {
+         setButtonLoading('createSimpleDiaryButton', false);
        }
      }
 
