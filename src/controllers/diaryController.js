@@ -95,7 +95,8 @@ const createDiary = async (req, res) => {
       sceneDescription,
       identifiedPerson,
       selectedPersonId,
-      userAppearanceKeywords
+      userAppearanceKeywords,
+      mainCharacterGender
     } = req.body;
     
     if (!content || content.trim() === '') {
@@ -121,53 +122,57 @@ const createDiary = async (req, res) => {
       sceneDescription: sceneDescription ? '있음' : '없음',
       identifiedPerson,
       selectedPersonId,
-      userAppearanceKeywords
+      userAppearanceKeywords,
+      mainCharacterGender
     });
     console.log('identifiedPerson:', identifiedPerson);
     console.log('selectedPersonId:', selectedPersonId);
+    console.log('mainCharacterGender:', mainCharacterGender);
     
     let mainCharacterData = {};
     let selectedPersonGender = '기타';
     
-    // identifiedPerson이 '나'가 아닌 경우에만 인물 선택 처리
-    if (identifiedPerson !== '나') {
-      if (!selectedPersonId) {
-        return res.status(400).json({ 
-          message: '주요 인물을 선택해주세요.',
-          requiresPersonSelection: true,
-          identifiedPerson: identifiedPerson
-        });
-      }
-      
-      // 선택된 인물 정보 조회
-      const selectedPerson = await Person.findOne({
-        _id: selectedPersonId,
-        user: req.user._id
-      });
-      
-      if (!selectedPerson) {
-        return res.status(404).json({ message: '선택한 인물을 찾을 수 없습니다.' });
-      }
-      
-      mainCharacterData = {
-        personId: selectedPerson._id,
-        name: selectedPerson.name,
-        isFromContacts: true
-      };
-      selectedPersonGender = selectedPerson.gender;
-      
-      // 태그 업데이트 (이미 selectMainCharacterAPI에서 처리되었지만 안전장치)
-      if (!selectedPerson.tags.includes(identifiedPerson)) {
-        selectedPerson.tags.push(identifiedPerson);
-        await selectedPerson.save();
-      }
-    } else {
-      // identifiedPerson이 '나'인 경우
+    // identifiedPerson이 '나'인 경우 처리
+    if (identifiedPerson === '나') {
       mainCharacterData = {
         name: '나',
         isFromContacts: false
       };
-      selectedPersonGender = '기타'; // 본인의 경우 성별을 따로 처리하지 않음
+      selectedPersonGender = req.user.gender || '기타'; // 사용자 계정의 성별 사용
+    } else {
+      // 다른 인물인 경우 - selectedPersonId가 있으면 기존 인물, 없으면 새 인물
+      if (selectedPersonId) {
+        // 기존 인물 선택
+        const selectedPerson = await Person.findOne({
+          _id: selectedPersonId,
+          user: req.user._id
+        });
+        
+        if (!selectedPerson) {
+          return res.status(404).json({ message: '선택한 인물을 찾을 수 없습니다.' });
+        }
+        
+        mainCharacterData = {
+          personId: selectedPerson._id,
+          name: selectedPerson.name,
+          isFromContacts: true
+        };
+        selectedPersonGender = selectedPerson.gender;
+        
+        // 태그 업데이트
+        if (!selectedPerson.tags.includes(identifiedPerson)) {
+          selectedPerson.tags.push(identifiedPerson);
+          await selectedPerson.save();
+        }
+      } else {
+        // 새로운 인물 (연락처에 없는 경우)
+        mainCharacterData = {
+          name: identifiedPerson,
+          isFromContacts: false
+        };
+        selectedPersonGender = mainCharacterGender || '기타';
+        console.log('새로운 인물로 처리:', identifiedPerson, '성별:', selectedPersonGender);
+      }
     }
     
     // 화풍 정보 조회
@@ -205,25 +210,45 @@ const createDiary = async (req, res) => {
     
     console.log('일기 저장 완료:', newDiary._id);
     
-    // 이미지 생성 시작 (비동기)
-    generateImageForDiary(newDiary, req.user, artStyle, sceneDescription, userAppearanceKeywords || '')
-      .catch(error => {
-        console.error('이미지 생성 실패:', error);
-      });
+    // 이미지 생성 대기 (동기적 처리)
+    console.log('이미지 생성 시작 - 완료까지 대기...');
+    const imageResult = await generateImageForDiary(newDiary, req.user, artStyle, sceneDescription, userAppearanceKeywords || '');
     
-    res.status(201).json({
-      message: '일기가 성공적으로 작성되었습니다. 이미지 생성이 진행 중입니다.',
-      diary: {
-        _id: newDiary._id,
-        content: newDiary.content,
-        diaryDate: newDiary.diaryDate,
-        sceneDescription: newDiary.sceneDescription,
-        imagePrompt: newDiary.imagePrompt,
-        artStyleId: newDiary.artStyleId,
-        mainCharacter: newDiary.mainCharacter,
-        generatedImage: null // 이미지는 생성 중
-      }
-    });
+    // 최신 일기 정보 조회 (이미지 URL 포함)
+    const updatedDiary = await Diary.findById(newDiary._id).populate('mainCharacter.personId', 'name gender photo');
+    
+    if (imageResult.success) {
+      res.status(201).json({
+        message: '일기가 성공적으로 작성되고 이미지가 생성되었습니다.',
+        diary: {
+          _id: updatedDiary._id,
+          content: updatedDiary.content,
+          diaryDate: updatedDiary.diaryDate,
+          sceneDescription: updatedDiary.sceneDescription,
+          imagePrompt: updatedDiary.imagePrompt,
+          artStyleId: updatedDiary.artStyleId,
+          mainCharacter: updatedDiary.mainCharacter,
+          generatedImage: updatedDiary.generatedImage,
+          imageGenerationStatus: updatedDiary.imageGenerationStatus
+        }
+      });
+    } else {
+      res.status(201).json({
+        message: '일기가 작성되었지만 이미지 생성에 실패했습니다.',
+        diary: {
+          _id: updatedDiary._id,
+          content: updatedDiary.content,
+          diaryDate: updatedDiary.diaryDate,
+          sceneDescription: updatedDiary.sceneDescription,
+          imagePrompt: updatedDiary.imagePrompt,
+          artStyleId: updatedDiary.artStyleId,
+          mainCharacter: updatedDiary.mainCharacter,
+          generatedImage: null,
+          imageGenerationStatus: updatedDiary.imageGenerationStatus,
+          imageGenerationError: updatedDiary.imageGenerationError
+        }
+      });
+    }
     
   } catch (error) {
     console.error('일기 작성 오류:', error);
@@ -231,7 +256,7 @@ const createDiary = async (req, res) => {
   }
 };
 
-// 이미지 생성 함수 (비동기)
+// 이미지 생성 함수 (동기적 처리)
 const generateImageForDiary = async (diary, user, artStyle, sceneDescription, userAppearanceKeywords) => {
   try {
     console.log('=== 이미지 생성 시작 ===');
@@ -286,6 +311,13 @@ const generateImageForDiary = async (diary, user, artStyle, sceneDescription, us
       console.log('이미지 생성 완료:', result.imageUrl);
       console.log('실행 시간:', result.executionTime || '알 수 없음');
       console.log('워크플로우:', result.workflowFile || '알 수 없음');
+      
+      return {
+        success: true,
+        imageUrl: result.imageUrl,
+        executionTime: result.executionTime,
+        workflowFile: result.workflowFile
+      };
     } else {
       // 실패 상태 업데이트
       await Diary.findByIdAndUpdate(diary._id, {
@@ -295,6 +327,12 @@ const generateImageForDiary = async (diary, user, artStyle, sceneDescription, us
       
       console.error('이미지 생성 실패:', result.error);
       console.error('워크플로우:', result.workflowFile || '알 수 없음');
+      
+      return {
+        success: false,
+        error: result.error || '이미지 생성 실패',
+        workflowFile: result.workflowFile
+      };
     }
     
   } catch (error) {
@@ -305,6 +343,11 @@ const generateImageForDiary = async (diary, user, artStyle, sceneDescription, us
       imageGenerationStatus: 'failed',
       imageGenerationError: error.message
     });
+    
+    return {
+      success: false,
+      error: error.message
+    };
   }
 };
 

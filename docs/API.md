@@ -430,22 +430,23 @@ Content-Type: multipart/form-data
 
 Body:
 - content: string (required) - 일기 내용 (@태그 지원)
-- diaryDate: date (optional) - 일기 날짜
+- diaryDate: date (optional) - 일기 날짜  
 - artStyleId: string (required) - 화풍 ID
 - sceneDescription: string (required) - 장면 묘사 (generate-scene에서 받은 값)
+- identifiedPerson: string (required) - 식별된 주인공 이름 ('나' 또는 인물명)
 - userAppearanceKeywords: string (required) - 사용자 외모 키워드
 - mainCharacterGender: string (optional) - 새 주인공의 성별 (연락처에 없는 경우)
+- selectedPersonId: string (optional) - 기존 연락처에서 선택한 인물 ID
 - photos: file[] (optional, max: 5) - 첨부 사진
 
-Response:
+Response (성공 시):
 {
-  "message": "일기가 작성되었습니다.",
+  "message": "일기가 성공적으로 작성되고 이미지가 생성되었습니다.",
   "diary": {
     "_id": "string",
     "content": "string",
     "diaryDate": "date",
-    "photos": ["string"],
-    "generatedImage": "string",
+    "sceneDescription": "string",
     "imagePrompt": "string",
     "artStyleId": "string",
     "mainCharacter": {
@@ -453,14 +454,30 @@ Response:
       "name": "string",
       "isFromContacts": boolean
     },
-    "promptLog": {
-      "finalPrompt": "string",
-      "characterDescription": "string",
-      "sceneDescription": "string",
-      "createdAt": "date"
-    }
-  },
-  "imageGenerated": boolean
+    "generatedImage": "string", // 생성된 이미지 경로
+    "imageGenerationStatus": "completed"
+  }
+}
+
+Response (이미지 생성 실패 시):
+{
+  "message": "일기가 작성되었지만 이미지 생성에 실패했습니다.",
+  "diary": {
+    "_id": "string",
+    "content": "string",
+    "diaryDate": "date",
+    "sceneDescription": "string",
+    "imagePrompt": "string",
+    "artStyleId": "string",
+    "mainCharacter": {
+      "personId": "string",
+      "name": "string",
+      "isFromContacts": boolean
+    },
+    "generatedImage": null,
+    "imageGenerationStatus": "failed",
+    "imageGenerationError": "string"
+  }
 }
 ```
 
